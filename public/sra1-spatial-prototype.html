@@ -23,6 +23,7 @@
     .live{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;font-size:12px;background:#fff}
     .live i{width:8px;height:8px;border-radius:50%;background:#24a679;box-shadow:0 0 0 4px #e0f5ed}
     .ghost{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 12px;color:var(--ink)}
+    .zone-select{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-weight:700}
     .content{position:relative;min-height:0;display:grid}
     #stage{position:absolute;inset:0;background:linear-gradient(140deg,#f8faf8 0%,#eef2ef 100%)}
     #stage canvas{display:block;width:100%;height:100%}
@@ -91,8 +92,11 @@
   <main class="app">
     <header class="topbar">
       <div class="brand"><div class="brandmark">IC</div><div><h1>Inventory Control Tower</h1><p>WH Dry Cibitung · Spatial visibility</p></div></div>
-      <div class="crumb"><span>Full layout</span><b>›</b><strong>SRA1</strong></div>
+      <div class="crumb"><span>Full layout</span><b>›</b><strong id="zoneCrumb">SRA1</strong></div>
       <div class="spacer"></div>
+      <select class="zone-select" id="zoneSelect" aria-label="Select zone">
+        <option value="SRA1">SRA1</option><option value="SRB1">SRB1</option><option value="SRC1">SRC1</option>
+      </select>
       <button class="ghost" id="resetView">Reset view</button>
       <div class="live"><i></i><span id="freshness">Loading snapshot…</span></div>
     </header>
@@ -105,8 +109,8 @@
       <div class="top-kpis" id="topKpis"></div>
       <aside class="panel summary">
         <div class="eyebrow">Zone intelligence</div>
-        <h2>SRA1 storage map</h2>
-        <div class="sub">16 Aisle · 14 urutan rack · 6 level. Pallet berwarna berarti SLOC memiliki SOH.</div>
+        <h2 id="zoneTitle">SRA1 storage map</h2>
+        <div class="sub" id="zoneMeta">Loading master structure. Pallet berwarna berarti SLOC memiliki SOH.</div>
         <div class="kpis" id="kpis"></div>
         <div class="legend">
           <span><i class="dot empty"></i>Empty</span><span><i class="dot compliant"></i>L1 sesuai</span>
@@ -142,6 +146,8 @@
 
     const VARIANTS = {A:"Analytical sidecar",B:"Command map",C:"Aisle explorer",CB:"Aisle command"};
     const query = new URLSearchParams(location.search);
+    const SUPPORTED_ZONES=["SRA1","SRB1","SRC1"];
+    const zone=SUPPORTED_ZONES.includes((query.get("zone")||"").toUpperCase())?query.get("zone").toUpperCase():"SRA1";
     let variant = VARIANTS[query.get("variant")] ? query.get("variant") : "CB";
     document.body.dataset.variant = variant;
     const $ = (id) => document.getElementById(id);
@@ -155,6 +161,10 @@
     $("prevVariant").onclick=()=>cycle(-1); $("nextVariant").onclick=()=>cycle(1);
     addEventListener("keydown",e=>{if(["INPUT","TEXTAREA"].includes(document.activeElement.tagName)||document.activeElement.isContentEditable)return;if(e.key==="ArrowLeft")cycle(-1);if(e.key==="ArrowRight")cycle(1)});
     setVariant(variant);
+    $("zoneSelect").value=zone;
+    $("zoneSelect").onchange=event=>{query.set("zone",event.target.value);query.set("variant",variant);location.search=query.toString()};
+    $("zoneCrumb").textContent=zone;$("zoneTitle").textContent=`${zone} storage map`;
+    document.title=`${zone} Spatial Prototype · Inventory Control Tower`;
 
     const stage=$("stage"), loading=$("loading");
     const scene=new THREE.Scene(); scene.background=new THREE.Color(0xf3f6f3);
@@ -170,12 +180,12 @@
     const grid=new THREE.GridHelper(90,90,0xcfd8d2,0xdfe6e1);grid.position.y=-.04;scene.add(grid);
 
     const raycaster=new THREE.Raycaster(), pointer=new THREE.Vector2();
-    let cellMesh,palletMesh,cellRecords=[],palletRecords=[],baseCellColors=[],basePalletColors=[],activeAisle=null;
+    let cellMesh,palletMesh,cellRecords=[],palletRecords=[],baseCellColors=[],basePalletColors=[],activeAisle=null,aisleValues=[],sequenceValues=[];
     const colors={EMPTY:0xcbd4d2,COMPLIANT:0x27a67a,WRONG_L1:0xdc5050,NO_TARGET:0xd39a35,EXCLUDED:0x845ec2};
     const matrix=new THREE.Matrix4(), color=new THREE.Color();
 
     function decodeMaster(master){
-      const zoneId=master.dictionaries.zone.indexOf("SRA1");
+      const zoneId=master.dictionaries.zone.indexOf(zone);
       return master.locations.filter(r=>r[2]===zoneId).map(r=>({
         rack_name:r[0], rack_sequence:Number(master.dictionaries.rack_sequence[r[3]]),
         aisle:Number(master.dictionaries.aisle[r[4]]), level:Number(master.dictionaries.level[r[5]].replace("L","")),
@@ -183,8 +193,8 @@
       }));
     }
     function coordinates(row){
-      const aisles=16, aisleIndex=row.aisle-2;
-      return {x:(aisleIndex-(aisles-1)/2)*3.55+(row.position-2)*.52,y:.22+(row.level-1)*.48,z:(row.rack_sequence-7.5)*.78};
+      const aisleIndex=aisleValues.indexOf(row.aisle),sequenceIndex=sequenceValues.indexOf(row.rack_sequence);
+      return {x:(aisleIndex-(aisleValues.length-1)/2)*3.55+(row.position-2)*.52,y:.22+(row.level-1)*.48,z:(sequenceIndex-(sequenceValues.length-1)/2)*.78};
     }
     function fmt(n){return new Intl.NumberFormat("id-ID",{maximumFractionDigits:0}).format(n||0)}
     function kpiMarkup(label,value,note=""){return `<div class="kpi"><span>${label}</span><strong>${value}</strong><small>${note}</small></div>`}
@@ -194,10 +204,14 @@
       try{
         const [master,status]=await Promise.all([
           fetch("/data/master-rack-index.json").then(r=>r.json()),
-          fetch("/api/rack-status?zone=SRA1").then(r=>r.json())
+          fetch(`/api/rack-status?zone=${zone}`).then(r=>r.json())
         ]);
         if(!status.ok)throw new Error(status.message||"Live SOH gagal dimuat");
         const rows=decodeMaster(master), statusMap=new Map(status.locations.map(x=>[x.rack_name,x]));
+        aisleValues=[...new Set(rows.map(r=>r.aisle))].sort((a,b)=>a-b);
+        sequenceValues=[...new Set(rows.map(r=>r.rack_sequence))].sort((a,b)=>a-b);
+        const levels=[...new Set(rows.map(r=>r.level))];
+        $("zoneMeta").textContent=`${aisleValues.length} Aisle · ${sequenceValues.length} urutan rack · ${levels.length} level. Pallet berwarna berarti SLOC memiliki SOH.`;
         buildScene(rows,statusMap); renderSummary(rows,status); buildAisles(rows); updateFreshness(status.snapshot_at);
         loading.style.display="none";
       }catch(error){loading.innerHTML=`<div class="loader-card error"><strong>Preview gagal dimuat</strong><div class="sub">${error.message}</div></div>`}
@@ -211,7 +225,7 @@
       occupied.forEach((row,i)=>{const p=coordinates(row),live=statusMap.get(row.rack_name);matrix.makeTranslation(p.x,p.y+.02,p.z);palletMesh.setMatrixAt(i,matrix);color.setHex(colors[live.status]||colors.NO_TARGET);palletMesh.setColorAt(i,color);basePalletColors[i]=color.clone();palletRecords[i]={...row,status:live.status,live,p}});
       cellMesh.instanceMatrix.needsUpdate=true;cellMesh.instanceColor.needsUpdate=true;palletMesh.instanceMatrix.needsUpdate=true;palletMesh.instanceColor.needsUpdate=true;
       cellMesh.userData.kind="cell";palletMesh.userData.kind="pallet";scene.add(cellMesh,palletMesh);
-      camera.position.set(34,25,30);controls.target.set(0,1.4,0);controls.update();
+      resetCamera();
     }
     function renderSummary(rows,status){
       const empty=rows.length-status.summary.occupied;
@@ -228,8 +242,7 @@
       document.querySelector('[data-filter="EMPTY"]').textContent=`Empty · ${fmt(empty)}`;
     }
     function buildAisles(rows){
-      const aisles=[...new Set(rows.map(r=>r.aisle))].sort((a,b)=>a-b);
-      $("aisleList").innerHTML=aisles.map(a=>`<button class="aisle-btn" data-aisle="${a}">Aisle ${String(a).padStart(2,"0")}</button>`).join("");
+      $("aisleList").innerHTML=aisleValues.map(a=>`<button class="aisle-btn" data-aisle="${a}">Aisle ${String(a).padStart(2,"0")}</button>`).join("");
       document.querySelectorAll(".aisle-btn").forEach(btn=>btn.onclick=()=>focusAisle(Number(btn.dataset.aisle),btn));
     }
     function updateFreshness(value){
@@ -238,10 +251,10 @@
     function focusAisle(aisle,button){
       activeAisle=activeAisle===aisle?null:aisle;document.querySelectorAll(".aisle-btn").forEach(b=>b.classList.toggle("active",Number(b.dataset.aisle)===activeAisle));
       applyVisibility();
-      if(activeAisle){const x=(activeAisle-2-7.5)*3.55;controls.target.set(x,1.3,0);camera.position.set(x+9,8,14)}
+      if(activeAisle){const x=(aisleValues.indexOf(activeAisle)-(aisleValues.length-1)/2)*3.55;controls.target.set(x,1.3,0);camera.position.set(x+9,8,14)}
       else resetCamera();
     }
-    function resetCamera(){camera.position.set(34,25,30);controls.target.set(0,1.4,0);controls.update()}
+    function resetCamera(){const width=Math.max(aisleValues.length*3.55,22),depth=Math.max(sequenceValues.length*.78,12);camera.position.set(width*.62,Math.max(18,width*.42),Math.max(24,depth*1.65));controls.target.set(0,1.4,0);controls.update()}
     $("resetView").onclick=()=>{activeAisle=null;document.querySelectorAll(".aisle-btn").forEach(b=>b.classList.remove("active"));currentFilter="ALL";document.querySelectorAll(".control").forEach(b=>b.classList.toggle("active",b.dataset.filter==="ALL"));applyVisibility();resetCamera()}
     let currentFilter="ALL";
     document.querySelectorAll(".control").forEach(btn=>btn.onclick=()=>{currentFilter=btn.dataset.filter;document.querySelectorAll(".control").forEach(b=>b.classList.toggle("active",b===btn));applyVisibility()});
