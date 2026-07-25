@@ -4,6 +4,7 @@ const { Pool } = require("pg");
 
 const ROW_LIMIT = 100000;
 const BATCH_SIZE = 250;
+const SHARE_NAME = "inventory_cbt_org_share";
 const DATABASE_PATTERN = /^[a-z][a-z0-9_]*$/i;
 
 let pool;
@@ -316,6 +317,11 @@ async function ensureSchema(client) {
   await client.query("CREATE INDEX IF NOT EXISTS soh_current_rack_idx ON soh_current(rack_name)");
   await client.query("CREATE INDEX IF NOT EXISTS soh_current_sku_idx ON soh_current(sku_number)");
   await client.query("CREATE INDEX IF NOT EXISTS soh_current_zone_idx ON soh_current(zone)");
+  await client.query(`
+    CREATE SHARE IF NOT EXISTS ${SHARE_NAME}
+    FROM ${db}
+    (ACCESS ORGANIZATION, VISIBILITY DISCOVERABLE, UPDATE AUTOMATIC)
+  `);
 }
 
 const DB_FIELDS = [
