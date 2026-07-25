@@ -18,34 +18,34 @@ test("uses rack sequence as bay and 07 as aisle", () => {
   });
 });
 
-test("applies SRC aisle 18 Tata Rumah only to rack sequence 13-17", () => {
+test("applies SRC rack sequence 18 Tata Rumah only to physical Aisle 13-17", () => {
   assert.equal(
-    evaluateCategory("CBT-SRC1-13-18-L2-01", "Tata Rumah").result,
+    evaluateCategory("CBT-SRC1-18-13-L2-01", "Tata Rumah").result,
     "COMPLIANT",
   );
   assert.equal(
-    evaluateCategory("CBT-SRC1-12-18-L2-01", "Tata Rumah").result,
+    evaluateCategory("CBT-SRC1-18-12-L2-01", "Tata Rumah").result,
     "WRONG_L1",
   );
 });
 
 test("keeps blank targets and non-halal outside accuracy", () => {
-  assert.equal(targetFor("CBT-SRC1-01-04-L1-01").status, "NO_TARGET");
+  assert.equal(targetFor("CBT-SRC1-04-03-L1-01").status, "NO_TARGET");
   const excluded = Object.entries(
     require("../public/data/l1-placement-rules.json").rules,
   ).find(([, rule]) => rule.excluded);
   assert.ok(excluded);
-  const [zone, aisle] = excluded[0].split(":");
-  assert.equal(targetFor(`CBT-${zone}-01-${aisle}-L1-01`).status, "EXCLUDED");
+  const [zone, rackSequence] = excluded[0].split(":");
+  assert.equal(targetFor(`CBT-${zone}-${rackSequence}-01-L1-01`).status, "EXCLUDED");
 });
 
 test("aggregates occupied SLOC and marks any wrong category as WRONG_L1", () => {
   const rows = [
     {
-      rack_name: "CBT-SRC1-13-18-L2-01",
+      rack_name: "CBT-SRC1-18-13-L2-01",
       zone: "SRC1",
-      rack_sequence: "13",
-      aisle: "18",
+      rack_sequence: "18",
+      aisle: "13",
       rack_level: "L2",
       sku_number: "A",
       l1_category_name: "Tata Rumah",
@@ -54,10 +54,10 @@ test("aggregates occupied SLOC and marks any wrong category as WRONG_L1", () => 
       stock_value: 100,
     },
     {
-      rack_name: "CBT-SRC1-13-18-L2-01",
+      rack_name: "CBT-SRC1-18-13-L2-01",
       zone: "SRC1",
-      rack_sequence: "13",
-      aisle: "18",
+      rack_sequence: "18",
+      aisle: "13",
       rack_level: "L2",
       sku_number: "B",
       l1_category_name: "Produk Segar",
