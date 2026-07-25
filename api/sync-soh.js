@@ -488,3 +488,9 @@ module.exports._test = {
   normalizeRow,
   supersetPayload,
 };
+
+module.exports._internal = {
+  databaseName,
+  ensureSchema,
+  getPool,
+};
