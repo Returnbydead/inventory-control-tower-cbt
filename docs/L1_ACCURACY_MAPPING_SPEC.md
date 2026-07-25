@@ -46,8 +46,9 @@ The warehouse owner confirmed that Mezzanine A-F maps to physical MZA-MZF concep
 For standard mezzanine locations:
 
 ```text
-workbook gangway = rack address aisle
-allowed category applies to all bays, rack levels, and positions in that aisle
+workbook gangway = rack address rack_sequence (first number after zone)
+physical Aisle = second number after zone
+allowed category applies to all physical Aisles, rack levels, and positions in that rack sequence
 ```
 
 ## 3. Proposed SPR mapping
@@ -62,16 +63,17 @@ These counts exactly match the master rack aisle counts:
 
 | Workbook gangway family | Physical zone | Aisle range |
 |---|---|---|
-| A | SRA1 | 01-14 |
-| B | SRB1 | 01-20 |
-| C | SRC1 | 01-24 |
+| A | SRA1 | rack_sequence 01-14 |
+| B | SRB1 | rack_sequence 01-20 |
+| C | SRC1 | rack_sequence 01-24 |
 
 For SPR:
 
 ```text
 letter = physical SPR zone
-numeric aisle = rack address aisle
-allowed category applies to all bays, rack levels, and positions unless a bay exception is stated
+numeric workbook Aisle = rack address rack_sequence (first number after zone)
+physical Aisle = second number after zone
+allowed category applies to all physical Aisles, rack levels, and positions unless an Aisle exception is stated
 ```
 
 ## 4. Category normalization
@@ -104,7 +106,7 @@ Biskuit
 
 mean either `Snack` or `Biskuit` is compliant.
 
-### SRC1 aisle 18
+### SRC1 rack sequence 18
 
 The workbook states:
 
@@ -115,9 +117,9 @@ Tata Rumah (only bay 13-17)
 
 Confirmed interpretation:
 
-- `Perawatan Rumah` is allowed across SRC1 aisle 18.
-- `Tata Rumah` is allowed only on bays 13-17.
-- `Tata Rumah` outside bays 13-17 is non-compliant.
+- `Perawatan Rumah` is allowed across SRC1 rack sequence 18.
+- `Tata Rumah` is allowed only on physical Aisle 13-17.
+- `Tata Rumah` outside physical Aisle 13-17 is non-compliant.
 
 ### Blank SPR target rows
 

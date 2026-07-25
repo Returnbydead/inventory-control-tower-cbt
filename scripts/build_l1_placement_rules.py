@@ -56,14 +56,16 @@ def main() -> None:
     spr_zone = {"A": "SRA1", "B": "SRB1", "C": "SRC1"}
     for row in range(3, 111):
         gangway = sheet.cell(row, 1).value
-        aisle = sheet.cell(row, 2).value
-        if not gangway or aisle is None:
+        rack_sequence = sheet.cell(row, 2).value
+        if not gangway or rack_sequence is None:
             continue
         family = str(gangway).split("-", 1)[0].strip().upper()
         if family not in spr_zone:
             continue
         categories_allowed, excluded = allowed(sheet.cell(row, 3).value)
-        key = f"{spr_zone[family]}:{int(aisle):02d}"
+        # The workbook calls this "Aisle", but the confirmed rack address
+        # structure maps it to the first number after zone: rack_sequence.
+        key = f"{spr_zone[family]}:{int(rack_sequence):02d}"
         rules[key] = {
             "allowed": categories_allowed,
             "excluded": excluded,
@@ -79,14 +81,14 @@ def main() -> None:
         ("E", 26, 27, 28, 29),
         ("F", 31, 32, 33, 34),
     ]
-    for module, level_col, aisle_col, category_col, business_zone_col in blocks:
+    for module, level_col, rack_sequence_col, category_col, business_zone_col in blocks:
         current_floor = None
         for row in range(3, 111):
             level_value = sheet.cell(row, level_col).value
             if level_value is not None:
                 current_floor = int(level_value)
-            aisle_value = sheet.cell(row, aisle_col).value
-            if aisle_value is None or current_floor is None:
+            rack_sequence_value = sheet.cell(row, rack_sequence_col).value
+            if rack_sequence_value is None or current_floor is None:
                 continue
 
             business_zone = norm(sheet.cell(row, business_zone_col).value)
@@ -96,13 +98,13 @@ def main() -> None:
                 physical_zone = f"MZ{module}{current_floor}"
 
             categories_allowed, excluded = allowed(sheet.cell(row, category_col).value)
-            key = f"{physical_zone}:{int(aisle_value):02d}"
+            key = f"{physical_zone}:{int(rack_sequence_value):02d}"
             rules[key] = {
                 "allowed": categories_allowed,
                 "excluded": excluded,
                 "source": (
                     f"Mezzanine {module} floor {current_floor} "
-                    f"aisle {int(aisle_value)}"
+                    f"rack sequence {int(rack_sequence_value)}"
                 ),
                 "bay_allowed": {},
             }
