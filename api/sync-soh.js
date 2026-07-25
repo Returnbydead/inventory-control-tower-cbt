@@ -1,4 +1,5 @@
 const { createHash, randomUUID, timingSafeEqual } = require("crypto");
+const { waitUntil } = require("@vercel/functions");
 const { Pool } = require("pg");
 
 const ROW_LIMIT = 100000;
@@ -337,6 +338,11 @@ async function writeSnapshot(client, rawRows, runId) {
 
   await client.query("BEGIN");
   try {
+    // soh_current is a complete snapshot. Replacing it inside one transaction
+    // avoids MotherDuck's PostgreSQL compatibility issue when a later sync
+    // multi-row upserts keys that already exist.
+    const deleted = await client.query("DELETE FROM soh_current");
+
     for (let offset = 0; offset < rows.length; offset += BATCH_SIZE) {
       const batch = rows.slice(offset, offset + BATCH_SIZE);
       const values = [];
@@ -354,30 +360,10 @@ async function writeSnapshot(client, rawRows, runId) {
       await client.query(`
         INSERT INTO soh_current (${DB_FIELDS.join(",")})
         VALUES ${placeholders.join(",")}
-        ON CONFLICT (source_row_key) DO UPDATE SET
-          location_name = excluded.location_name,
-          product_name = excluded.product_name,
-          stock = excluded.stock,
-          l1_category_name = excluded.l1_category_name,
-          l2_category_name = excluded.l2_category_name,
-          product_detail_updated_by = excluded.product_detail_updated_by,
-          product_detail_updated_at = excluded.product_detail_updated_at,
-          stock_value = excluded.stock_value,
-          zone = excluded.zone,
-          rack_sequence = excluded.rack_sequence,
-          aisle = excluded.aisle,
-          rack_level = excluded.rack_level,
-          remarks_zone = excluded.remarks_zone,
-          last_seen_run_id = excluded.last_seen_run_id,
-          synced_at = excluded.synced_at
       `, values);
       written += batch.length;
     }
 
-    const deleted = await client.query(
-      "DELETE FROM soh_current WHERE last_seen_run_id <> $1",
-      [runId],
-    );
     await client.query("COMMIT");
     return { uniqueRows: rows.length, written, deleted: deleted.rowCount || 0 };
   } catch (error) {
@@ -388,8 +374,15 @@ async function writeSnapshot(client, rawRows, runId) {
 
 function authorized(req) {
   const expected = clean(process.env.SYNC_SECRET);
-  const supplied = clean(req.headers.authorization);
-  return Boolean(expected && supplied && safeEqual(supplied, `Bearer ${expected}`));
+  const authorization = clean(req.headers.authorization);
+  const syncSecret = clean(req.headers["x-sync-secret"]);
+  return Boolean(
+    expected
+      && (
+        (authorization && safeEqual(authorization, `Bearer ${expected}`))
+        || (syncSecret && safeEqual(syncSecret, expected))
+      )
+  );
 }
 
 function json(res, status, body) {
@@ -397,20 +390,28 @@ function json(res, status, body) {
   return res.status(status).json(body);
 }
 
-module.exports = async function handler(req, res) {
-  if (!["GET", "POST"].includes(req.method)) {
-    res.setHeader("Allow", "GET, POST");
-    return json(res, 405, { ok: false, message: "Method not allowed" });
-  }
-  if (!authorized(req)) {
-    return json(res, 401, { ok: false, message: "Unauthorized" });
-  }
-
-  const runId = randomUUID();
+async function executeSync(runId) {
   let client;
   try {
     client = await getPool().connect();
     await ensureSchema(client);
+
+    const activeRun = await client.query(`
+      SELECT run_id
+      FROM soh_sync_runs
+      WHERE status = 'RUNNING'
+        AND started_at >= CURRENT_TIMESTAMP - INTERVAL '10 minutes'
+      ORDER BY started_at DESC
+      LIMIT 1
+    `);
+    if (activeRun.rows.length) {
+      console.info("SOH sync skipped; another run is active", {
+        runId,
+        activeRunId: activeRun.rows[0].run_id,
+      });
+      return;
+    }
+
     await client.query(
       "INSERT INTO soh_sync_runs (run_id, status) VALUES ($1, 'RUNNING')",
       [runId],
@@ -429,16 +430,12 @@ module.exports = async function handler(req, res) {
       WHERE run_id = $1
     `, [runId, rows.length, result.uniqueRows, result.written, result.deleted]);
 
-    return json(res, 200, {
-      ok: true,
-      data: {
-        run_id: runId,
-        fetched_rows: rows.length,
-        unique_rows: result.uniqueRows,
-        written_rows: result.written,
-        deleted_rows: result.deleted,
-        row_limit: ROW_LIMIT,
-      },
+    console.info("SOH sync completed", {
+      runId,
+      fetchedRows: rows.length,
+      uniqueRows: result.uniqueRows,
+      writtenRows: result.written,
+      deletedRows: result.deleted,
     });
   } catch (error) {
     console.error("SOH sync failed", { runId, message: error.message });
@@ -455,14 +452,27 @@ module.exports = async function handler(req, res) {
         console.error("Failed to persist sync error", logError);
       }
     }
-    return json(res, 500, {
-      ok: false,
-      run_id: runId,
-      message: error.message || "Sync failed",
-    });
   } finally {
     client?.release();
   }
+}
+
+module.exports = async function handler(req, res) {
+  if (!["GET", "POST"].includes(req.method)) {
+    res.setHeader("Allow", "GET, POST");
+    return json(res, 405, { ok: false, message: "Method not allowed" });
+  }
+  if (!authorized(req)) {
+    return json(res, 401, { ok: false, message: "Unauthorized" });
+  }
+
+  const runId = randomUUID();
+  waitUntil(executeSync(runId));
+  return json(res, 202, {
+    ok: true,
+    status: "accepted",
+    run_id: runId,
+  });
 };
 
 module.exports._test = {
