@@ -224,6 +224,8 @@
       ].join("");
       $("kpis").innerHTML=html;
       $("topKpis").innerHTML=html+kpiMarkup("Stock value",`Rp${(status.summary.stock_value/1e9).toFixed(1)}B`,"live SOH");
+      document.querySelector('[data-filter="WRONG_L1"]').textContent=`Wrong L1 · ${fmt(status.summary.wrong_l1)}`;
+      document.querySelector('[data-filter="EMPTY"]').textContent=`Empty · ${fmt(empty)}`;
     }
     function buildAisles(rows){
       const aisles=[...new Set(rows.map(r=>r.aisle))].sort((a,b)=>a-b);
@@ -244,9 +246,22 @@
     let currentFilter="ALL";
     document.querySelectorAll(".control").forEach(btn=>btn.onclick=()=>{currentFilter=btn.dataset.filter;document.querySelectorAll(".control").forEach(b=>b.classList.toggle("active",b===btn));applyVisibility()});
     function applyVisibility(){
-      cellRecords.forEach((r,i)=>{const matchAisle=!activeAisle||r.aisle===activeAisle;const matchFilter=currentFilter==="ALL"||r.status===currentFilter;cellMesh.setColorAt(i,matchAisle&&matchFilter?baseCellColors[i]:new THREE.Color(0xe8ecea))});
-      palletRecords.forEach((r,i)=>{const matchAisle=!activeAisle||r.aisle===activeAisle;const matchFilter=currentFilter==="ALL"||r.status===currentFilter;palletMesh.setColorAt(i,matchAisle&&matchFilter?basePalletColors[i]:new THREE.Color(0xdfe4e1))});
-      cellMesh.instanceColor.needsUpdate=true;palletMesh.instanceColor.needsUpdate=true;
+      const emptyMode=currentFilter==="EMPTY";
+      cellMesh.material.opacity=emptyMode ? .9 : (currentFilter==="ALL" ? .42 : .28);
+      cellRecords.forEach((r,i)=>{
+        const visible=(!activeAisle||r.aisle===activeAisle)&&(currentFilter==="ALL"||r.status===currentFilter);
+        const scale=visible?1:.001;
+        matrix.makeScale(scale,scale,scale);matrix.setPosition(r.p.x,r.p.y,r.p.z);cellMesh.setMatrixAt(i,matrix);
+        cellMesh.setColorAt(i,emptyMode&&visible?new THREE.Color(0x657b82):baseCellColors[i]);
+      });
+      palletRecords.forEach((r,i)=>{
+        const visible=(!activeAisle||r.aisle===activeAisle)&&(currentFilter==="ALL"||r.status===currentFilter);
+        const scale=visible?1:.001;
+        matrix.makeScale(scale,scale,scale);matrix.setPosition(r.p.x,r.p.y+.02,r.p.z);palletMesh.setMatrixAt(i,matrix);
+        palletMesh.setColorAt(i,basePalletColors[i]);
+      });
+      cellMesh.instanceMatrix.needsUpdate=true;cellMesh.instanceColor.needsUpdate=true;
+      palletMesh.instanceMatrix.needsUpdate=true;palletMesh.instanceColor.needsUpdate=true;
     }
     renderer.domElement.addEventListener("pointerup",event=>{
       const rect=renderer.domElement.getBoundingClientRect();pointer.x=((event.clientX-rect.left)/rect.width)*2-1;pointer.y=-((event.clientY-rect.top)/rect.height)*2+1;raycaster.setFromCamera(pointer,camera);
