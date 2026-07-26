@@ -3,7 +3,7 @@
   "redirects": [
     {
       "source": "/putaway",
-      "destination": "/putaway-control-tower-prototype.html?live=1",
+      "destination": "/preview/putaway-reporting-redesign.html",
       "permanent": false
     },
     {
