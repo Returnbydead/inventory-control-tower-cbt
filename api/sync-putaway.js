@@ -195,14 +195,32 @@ function normalizeItem(taskId, item) {
   };
 }
 
-function selectDetailRows(listRows, previous, newCompletedLimit = 100) {
+function selectDetailRows(
+  listRows,
+  previous,
+  newCompletedLimit = 20,
+  detailLimit = 40,
+) {
   const selected = [];
   const seen = new Set();
   let newCompleted = 0;
-  for (const row of listRows) {
+  const prioritizedRows = [...listRows].sort((left, right) => {
+    const leftPrevious = previous.get(Number(left.id));
+    const rightPrevious = previous.get(Number(right.id));
+    const leftNeedsBackfill = typeof leftPrevious === "object"
+      ? !leftPrevious.has_detail
+      : !leftPrevious;
+    const rightNeedsBackfill = typeof rightPrevious === "object"
+      ? !rightPrevious.has_detail
+      : !rightPrevious;
+    return Number(rightNeedsBackfill) - Number(leftNeedsBackfill);
+  });
+  for (const row of prioritizedRows) {
+    if (selected.length >= detailLimit) break;
     const id = Number(row.id);
     const status = clean(row.status).toUpperCase();
-    const priorStatus = previous.get(id);
+    const prior = previous.get(id);
+    const priorStatus = typeof prior === "object" ? prior?.status : clean(prior).toUpperCase();
     const active = ACTIVE_STATUSES.has(status);
     const changed = Boolean(priorStatus && priorStatus !== status);
     const newNonActive = !priorStatus && !active && newCompleted < newCompletedLimit;
@@ -339,21 +357,30 @@ async function executeSync(runId) {
       [runId],
     );
 
-    const maxPages = Number(process.env.WMS_PUTAWAY_MAX_PAGES || 30);
+    // Keep the operational snapshot inside the Vercel function window.
+    // Full historical backfill is handled separately from this live cron.
+    const maxPages = Number(process.env.WMS_PUTAWAY_MAX_PAGES || 1);
     const list = await fetchPutawayTasks({ maxPages });
     const existing = list.rows.length
       ? await client.query(
-        "SELECT task_id, status FROM putaway_tasks_current WHERE task_id = ANY($1::BIGINT[])",
+        `SELECT task_id, status,
+          CASE WHEN activities_json IS NOT NULL THEN TRUE ELSE FALSE END AS has_detail
+        FROM putaway_tasks_current
+        WHERE task_id = ANY($1::BIGINT[])`,
         [list.rows.map((row) => Number(row.id))],
       )
       : { rows: [] };
     const previous = new Map(
-      existing.rows.map((row) => [Number(row.task_id), clean(row.status).toUpperCase()]),
+      existing.rows.map((row) => [Number(row.task_id), {
+        status: clean(row.status).toUpperCase(),
+        has_detail: Boolean(row.has_detail),
+      }]),
     );
     const detailRows = selectDetailRows(
       list.rows,
       previous,
-      Number(process.env.WMS_NEW_COMPLETED_DETAIL_LIMIT || 100),
+      Number(process.env.WMS_NEW_COMPLETED_DETAIL_LIMIT || 5),
+      Number(process.env.WMS_DETAIL_BATCH_LIMIT || 10),
     );
 
     const detailBundles = await mapConcurrent(
