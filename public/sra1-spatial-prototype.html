@@ -96,6 +96,11 @@
       <div class="spacer"></div>
       <select class="zone-select" id="zoneSelect" aria-label="Select zone">
         <option value="SRA1">SRA1</option><option value="SRB1">SRB1</option><option value="SRC1">SRC1</option>
+        <optgroup label="Mezzanine Lantai 1">
+          <option value="MZA1">MZA1 · pair MZB1</option><option value="MZB1">MZB1 · pair MZA1</option>
+          <option value="MZC1">MZC1 · pair MZD1</option><option value="MZD1">MZD1 · pair MZC1</option>
+          <option value="MZE1">MZE1 · pair MZF1</option><option value="MZF1">MZF1 · pair MZE1</option>
+        </optgroup>
       </select>
       <button class="ghost" id="resetView">Reset view</button>
       <div class="live"><i></i><span id="freshness">Loading snapshot…</span></div>
@@ -146,7 +151,7 @@
 
     const VARIANTS = {A:"Analytical sidecar",B:"Command map",C:"Aisle explorer",CB:"Aisle command"};
     const query = new URLSearchParams(location.search);
-    const SUPPORTED_ZONES=["SRA1","SRB1","SRC1"];
+    const SUPPORTED_ZONES=["SRA1","SRB1","SRC1","MZA1","MZB1","MZC1","MZD1","MZE1","MZF1"];
     const zone=SUPPORTED_ZONES.includes((query.get("zone")||"").toUpperCase())?query.get("zone").toUpperCase():"SRA1";
     let variant = VARIANTS[query.get("variant")] ? query.get("variant") : "CB";
     document.body.dataset.variant = variant;
@@ -216,7 +221,7 @@
         aisleValues=[...new Set(rows.map(r=>r.aisle))].sort((a,b)=>a-b);
         sequenceValues=[...new Set(rows.map(r=>r.rack_sequence))].sort((a,b)=>a-b);
         const levels=[...new Set(rows.map(r=>r.level))];
-        const footprint=zone==="SRC1"?" · stepped/L footprint":"";
+        const footprint=zone==="SRC1"?" · stepped/L footprint":/^MZ[A-F]1$/.test(zone)?" · mezzanine lantai 1":"";
         $("zoneMeta").textContent=`${aisleValues.length} Aisle · ${sequenceValues.length} urutan rack · ${levels.length} level${footprint}. Pallet berwarna berarti SLOC memiliki SOH.`;
         buildFootprint(rows); buildScene(rows,statusMap); renderSummary(rows,status); buildAisles(rows); updateFreshness(status.snapshot_at);
         loading.style.display="none";
