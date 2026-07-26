@@ -277,23 +277,27 @@ async function replaceTaskRows(client, tasks, detailedTaskIds, items, runId, lis
       );
     }
 
-    for (const task of tasks) {
+    for (let offset = 0; offset < tasks.length; offset += 100) {
+      const batch = tasks.slice(offset, offset + 100);
+      const values = [];
+      const rows = batch.map((task, index) => {
+        const base = index * 14;
+        values.push(
+          task.task_id, task.task_number, task.purchase_order_number,
+          task.package_label, task.location_id, task.location_name, task.status,
+          task.staff_name, task.inbound_date, task.pending_at, task.in_progress_at,
+          task.completed_at, task.activities_json, runId,
+        );
+        return `(${Array.from({ length: 14 }, (_, parameter) => `$${base + parameter + 1}`).join(", ")}, CURRENT_TIMESTAMP)`;
+      });
       await client.query(`
         INSERT INTO putaway_tasks_current (
           task_id, task_number, purchase_order_number, package_label,
           location_id, location_name, status, staff_name, inbound_date,
           pending_at, in_progress_at, completed_at, activities_json,
           last_seen_run_id, synced_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9,
-          $10, $11, $12, $13, $14, CURRENT_TIMESTAMP
-        )
-      `, [
-        task.task_id, task.task_number, task.purchase_order_number,
-        task.package_label, task.location_id, task.location_name, task.status,
-        task.staff_name, task.inbound_date, task.pending_at, task.in_progress_at,
-        task.completed_at, task.activities_json, runId,
-      ]);
+        ) VALUES ${rows.join(", ")}
+      `, values);
     }
 
     if (detailedTaskIds.length) {
@@ -302,24 +306,28 @@ async function replaceTaskRows(client, tasks, detailedTaskIds, items, runId, lis
         [detailedTaskIds],
       );
     }
-    for (const item of items) {
+    for (let offset = 0; offset < items.length; offset += 100) {
+      const batch = items.slice(offset, offset + 100);
+      const values = [];
+      const rows = batch.map((item, index) => {
+        const base = index * 16;
+        values.push(
+          item.task_item_id, item.task_id, item.product_id, item.product_sku,
+          item.product_name, item.product_image_url, item.qty, item.base_uom,
+          item.carton_qty, item.carton_uom, item.from_rack_id,
+          item.from_rack_name, item.to_rack_id, item.to_rack_name,
+          item.staff_name, runId,
+        );
+        return `(${Array.from({ length: 16 }, (_, parameter) => `$${base + parameter + 1}`).join(", ")}, CURRENT_TIMESTAMP)`;
+      });
       await client.query(`
         INSERT INTO putaway_items_current (
           task_item_id, task_id, product_id, product_sku, product_name,
           product_image_url, qty, base_uom, carton_qty, carton_uom,
           from_rack_id, from_rack_name, to_rack_id, to_rack_name,
           staff_name, last_seen_run_id, synced_at
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15, $16, CURRENT_TIMESTAMP
-        )
-      `, [
-        item.task_item_id, item.task_id, item.product_id, item.product_sku,
-        item.product_name, item.product_image_url, item.qty, item.base_uom,
-        item.carton_qty, item.carton_uom, item.from_rack_id,
-        item.from_rack_name, item.to_rack_id, item.to_rack_name,
-        item.staff_name, runId,
-      ]);
+        ) VALUES ${rows.join(", ")}
+      `, values);
     }
     await client.query("COMMIT");
   } catch (error) {
