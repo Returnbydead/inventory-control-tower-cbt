@@ -79,3 +79,19 @@ test("details a task whenever its stored status changes", () => {
   );
   assert.equal(selected.length, 1);
 });
+
+test("backfills a stored completed task that still has no detail", () => {
+  const selected = selectDetailRows(
+    [
+      { id: 1, status: "COMPLETED" },
+      { id: 2, status: "COMPLETED" },
+    ],
+    new Map([
+      [1, { status: "COMPLETED", has_detail: false }],
+      [2, { status: "COMPLETED", has_detail: true }],
+    ]),
+    1,
+    10,
+  );
+  assert.deepEqual(selected.map((row) => row.id), [1]);
+});

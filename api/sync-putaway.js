@@ -221,13 +221,17 @@ function selectDetailRows(
     const status = clean(row.status).toUpperCase();
     const prior = previous.get(id);
     const priorStatus = typeof prior === "object" ? prior?.status : clean(prior).toUpperCase();
+    const needsBackfill = typeof prior === "object"
+      ? !prior.has_detail
+      : !prior;
     const active = ACTIVE_STATUSES.has(status);
     const changed = Boolean(priorStatus && priorStatus !== status);
     const newNonActive = !priorStatus && !active && newCompleted < newCompletedLimit;
-    if (active || changed || newNonActive) {
+    const incompleteNonActive = !active && needsBackfill && newCompleted < newCompletedLimit;
+    if (active || changed || newNonActive || incompleteNonActive) {
       if (!seen.has(id)) selected.push(row);
       seen.add(id);
-      if (newNonActive) newCompleted += 1;
+      if (newNonActive || incompleteNonActive) newCompleted += 1;
     }
   }
   return selected;
