@@ -23,6 +23,11 @@
     .live{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1px solid var(--line);border-radius:999px;font-size:12px;background:#fff}
     .live i{width:8px;height:8px;border-radius:50%;background:#24a679;box-shadow:0 0 0 4px #e0f5ed}
     .ghost{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 12px;color:var(--ink)}
+    .menu-wrap{position:relative}.menu-trigger{display:flex;align-items:center;gap:7px}
+    .app-menu{position:absolute;top:46px;left:0;width:238px;padding:8px;background:#fff;border:1px solid var(--line);border-radius:13px;box-shadow:var(--shadow);display:none;z-index:80}
+    .app-menu.open{display:block}.app-menu a{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:9px;color:#475467;text-decoration:none;font-size:12px;font-weight:700}
+    .app-menu a:hover{background:#f5f7f6}.app-menu a.active{background:var(--teal-soft);color:var(--teal)}
+    .app-menu small{display:block;padding:8px 12px 5px;color:#98a2b3;font-size:9px;font-weight:800;letter-spacing:.1em}
     .zone-select{border:1px solid var(--line);background:#fff;border-radius:10px;padding:9px 32px 9px 11px;color:var(--ink);font-weight:700}
     .content{position:relative;min-height:0;display:grid}
     #stage{position:absolute;inset:0;background:linear-gradient(140deg,#f8faf8 0%,#eef2ef 100%)}
@@ -91,6 +96,15 @@
 <body data-variant="A">
   <main class="app">
     <header class="topbar">
+      <div class="menu-wrap">
+        <button class="ghost menu-trigger" id="menuTrigger" aria-expanded="false">☰ <span>Menu</span></button>
+        <nav class="app-menu" id="appMenu" aria-label="Inventory Control Tower menu">
+          <small>CONTROL CENTER</small>
+          <a class="active" href="/sra1-spatial-prototype.html?zone=SRA1&amp;variant=CB">◇ 3D Spatial Visibility</a>
+          <small>INBOUND &amp; PUTAWAY</small>
+          <a href="/putaway">⇥ Putaway Monitoring</a>
+        </nav>
+      </div>
       <div class="brand"><div class="brandmark">IC</div><div><h1>Inventory Control Tower</h1><p>WH Dry Cibitung · Spatial visibility</p></div></div>
       <div class="crumb"><span>Full layout</span><b>›</b><strong id="zoneCrumb">SRA1</strong></div>
       <div class="spacer"></div>
@@ -163,6 +177,17 @@
     let variant = VARIANTS[query.get("variant")] ? query.get("variant") : "CB";
     document.body.dataset.variant = variant;
     const $ = (id) => document.getElementById(id);
+    $("menuTrigger").onclick=(event)=>{
+      event.stopPropagation();
+      const open=$("appMenu").classList.toggle("open");
+      $("menuTrigger").setAttribute("aria-expanded",String(open));
+    };
+    addEventListener("click",event=>{
+      if(!event.target.closest(".menu-wrap")){
+        $("appMenu").classList.remove("open");
+        $("menuTrigger").setAttribute("aria-expanded","false");
+      }
+    });
     function setVariant(next){
       variant=next; document.body.dataset.variant=next;
       $("variantLabel").textContent=`${next} — ${VARIANTS[next]}`;
