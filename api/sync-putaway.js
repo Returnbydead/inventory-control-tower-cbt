@@ -195,6 +195,26 @@ function normalizeItem(taskId, item) {
   };
 }
 
+function selectDetailRows(listRows, previous, newCompletedLimit = 100) {
+  const selected = [];
+  const seen = new Set();
+  let newCompleted = 0;
+  for (const row of listRows) {
+    const id = Number(row.id);
+    const status = clean(row.status).toUpperCase();
+    const priorStatus = previous.get(id);
+    const active = ACTIVE_STATUSES.has(status);
+    const changed = Boolean(priorStatus && priorStatus !== status);
+    const newNonActive = !priorStatus && !active && newCompleted < newCompletedLimit;
+    if (active || changed || newNonActive) {
+      if (!seen.has(id)) selected.push(row);
+      seen.add(id);
+      if (newNonActive) newCompleted += 1;
+    }
+  }
+  return selected;
+}
+
 async function replaceTaskRows(client, tasks, detailedTaskIds, items, runId, listComplete) {
   await client.query("BEGIN");
   try {
@@ -330,12 +350,11 @@ async function executeSync(runId) {
     const previous = new Map(
       existing.rows.map((row) => [Number(row.task_id), clean(row.status).toUpperCase()]),
     );
-    const detailRows = list.rows.filter((row) => {
-      const status = clean(row.status).toUpperCase();
-      return ACTIVE_STATUSES.has(status)
-        || !previous.has(Number(row.id))
-        || previous.get(Number(row.id)) !== status;
-    });
+    const detailRows = selectDetailRows(
+      list.rows,
+      previous,
+      Number(process.env.WMS_NEW_COMPLETED_DETAIL_LIMIT || 100),
+    );
 
     const detailBundles = await mapConcurrent(
       detailRows,
@@ -356,7 +375,9 @@ async function executeSync(runId) {
       bundle.items.map((item) => normalizeItem(bundle.taskId, item)),
     );
 
+    const detailedTaskIds = new Set(detailBundles.map((bundle) => bundle.taskId));
     const poNumbers = [...new Set(tasks
+      .filter((task) => detailedTaskIds.has(task.task_id))
       .map((task) => task.purchase_order_number)
       .filter((number) => /^ID1\/PO[RX]\//i.test(number)))];
     const poList = await fetchPurchaseOrders({
@@ -441,6 +462,7 @@ module.exports._test = {
   mergeTask,
   normalizeItem,
   mapConcurrent,
+  selectDetailRows,
   replacePurchaseOrders,
 };
 

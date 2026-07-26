@@ -5,6 +5,7 @@ const {
   mergeTask,
   normalizeItem,
   mapConcurrent,
+  selectDetailRows,
 } = require("../api/sync-putaway")._test;
 
 test("merges list and detail task fields", () => {
@@ -57,4 +58,24 @@ test("normalizes WIMS item rack and SKU fields", () => {
 test("bounded concurrency preserves result order", async () => {
   const result = await mapConcurrent([3, 1, 2], 2, async (value) => value * 2);
   assert.deepEqual(result, [6, 2, 4]);
+});
+
+test("first sync details every active task but caps completed backfill", () => {
+  const rows = [
+    { id: 1, status: "PENDING" },
+    { id: 2, status: "IN_PROGRESS" },
+    { id: 3, status: "COMPLETED" },
+    { id: 4, status: "COMPLETED" },
+  ];
+  const selected = selectDetailRows(rows, new Map(), 1);
+  assert.deepEqual(selected.map((row) => row.id), [1, 2, 3]);
+});
+
+test("details a task whenever its stored status changes", () => {
+  const selected = selectDetailRows(
+    [{ id: 1, status: "COMPLETED" }],
+    new Map([[1, "IN_PROGRESS"]]),
+    0,
+  );
+  assert.equal(selected.length, 1);
 });
