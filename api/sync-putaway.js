@@ -237,6 +237,13 @@ function selectDetailRows(
   return selected;
 }
 
+function selectSnapshotRows(listRows, recentLimit = 100) {
+  return listRows.filter((row, index) => {
+    const status = clean(row.status).toUpperCase();
+    return index < recentLimit || ACTIVE_STATUSES.has(status);
+  });
+}
+
 async function replaceTaskRows(client, tasks, detailedTaskIds, items, runId, listComplete) {
   await client.query("BEGIN");
   try {
@@ -363,8 +370,16 @@ async function executeSync(runId) {
 
     // Keep the operational snapshot inside the Vercel function window.
     // Full historical backfill is handled separately from this live cron.
-    const maxPages = Number(process.env.WMS_PUTAWAY_MAX_PAGES || 1);
-    const list = await fetchPutawayTasks({ maxPages });
+    // Active Putaway can be older than the newest 100 rows. Read enough list
+    // pages to retain operational PENDING/IN_PROGRESS tasks, while the heavier
+    // detail and item calls remain bounded below.
+    const maxPages = Number(process.env.WMS_PUTAWAY_MAX_PAGES || 10);
+    const fetchedList = await fetchPutawayTasks({ maxPages });
+    const list = {
+      rows: selectSnapshotRows(fetchedList.rows),
+      // This is an operational subset, not a full historical snapshot.
+      complete: false,
+    };
     const existing = list.rows.length
       ? await client.query(
         `SELECT task_id, status,
@@ -494,6 +509,7 @@ module.exports._test = {
   normalizeItem,
   mapConcurrent,
   selectDetailRows,
+  selectSnapshotRows,
   replacePurchaseOrders,
 };
 

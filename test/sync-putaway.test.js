@@ -6,6 +6,7 @@ const {
   normalizeItem,
   mapConcurrent,
   selectDetailRows,
+  selectSnapshotRows,
 } = require("../api/sync-putaway")._test;
 
 test("merges list and detail task fields", () => {
@@ -94,4 +95,17 @@ test("backfills a stored completed task that still has no detail", () => {
     10,
   );
   assert.deepEqual(selected.map((row) => row.id), [1]);
+});
+
+test("keeps every active task beyond the recent snapshot window", () => {
+  const rows = [
+    { id: 1, status: "COMPLETED" },
+    { id: 2, status: "COMPLETED" },
+    { id: 3, status: "IN_PROGRESS" },
+    { id: 4, status: "PENDING" },
+  ];
+  assert.deepEqual(
+    selectSnapshotRows(rows, 1).map((row) => row.id),
+    [1, 3, 4],
+  );
 });
