@@ -1,5 +1,12 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/sra1-spatial-prototype.html?zone=SRA1&variant=CB",
+      "permanent": false
+    }
+  ],
   "functions": {
     "api/sync-soh.js": {
       "maxDuration": 300
