@@ -44,11 +44,13 @@ function buildDashboard(taskRows, itemRows, {
   }
 
   const allTasks = taskRows.map((row) => {
+    const status = clean(row.status).toUpperCase();
     const completedAt = iso(row.completed_at);
     const slaResult = calculateSla({
       grnAt: row.received_at,
       completedAt,
       now,
+      isCompleted: status === "COMPLETED",
     });
     const items = itemsByTask.get(Number(row.task_id)) || [];
     return {
@@ -56,7 +58,7 @@ function buildDashboard(taskRows, itemRows, {
       task_number: clean(row.task_number),
       purchase_order_number: clean(row.purchase_order_number),
       package_label: clean(row.package_label),
-      status: clean(row.status).toUpperCase(),
+      status,
       staff_name: clean(row.staff_name) || null,
       pending_at: iso(row.pending_at),
       in_progress_at: iso(row.in_progress_at),

@@ -19,6 +19,8 @@
   --color-danger-soft: oklch(95% 0.035 27);
   --color-neutral-soft: oklch(95% 0.01 255);
   --color-shadow: oklch(20% 0.025 258 / 0.08);
+  --color-sidebar: oklch(20% 0.035 258);
+  --color-sidebar-muted: oklch(76% 0.025 255);
 
   --font-display: "Space Grotesk", "Segoe UI", sans-serif;
   --font-body: Inter, "Segoe UI", system-ui, sans-serif;
@@ -44,6 +46,8 @@
   --radius-panel: 0.75rem;
   --radius-pill: 999px;
   --rule-thin: 1px;
+  --sidebar-wide: 15.5rem;
+  --sidebar-compact: 4.5rem;
 
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);

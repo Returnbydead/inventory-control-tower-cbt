@@ -28,14 +28,31 @@ test("calculates active SLA from GRN until now", () => {
     remaining_minutes: 30,
     sla_state: "URGENT",
     within_sla: null,
+    sla_deadline_at: "2026-07-25T23:00:00.000Z",
+    sla_outcome: null,
   });
 });
 
 test("calculates completed task compliance", () => {
-  assert.equal(calculateSla({
+  const result = calculateSla({
     grnAt: "2026-07-26T00:00:00+07:00",
     completedAt: "2026-07-26T06:01:00+07:00",
-  }).within_sla, false);
+  });
+  assert.equal(result.within_sla, false);
+  assert.equal(result.sla_outcome, "MISSED");
+  assert.equal(result.remaining_minutes, -1);
+});
+
+test("does not fabricate an SLA result for completed task without completion time", () => {
+  const result = calculateSla({
+    grnAt: "2026-07-26T00:00:00+07:00",
+    isCompleted: true,
+    now: new Date("2026-07-27T00:00:00+07:00"),
+  });
+  assert.equal(result.elapsed_minutes, null);
+  assert.equal(result.sla_state, "NOT_STARTED");
+  assert.equal(result.sla_outcome, null);
+  assert.equal(result.sla_deadline_at, "2026-07-25T23:00:00.000Z");
 });
 
 test("normalizes WIMS task activities", () => {

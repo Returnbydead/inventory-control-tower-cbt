@@ -38,17 +38,19 @@
     .rail {
       position: fixed;
       inset: 0 auto 0 0;
-      z-index: 30;
-      width: 72px;
-      background: var(--color-ink);
+      z-index: 40;
+      width: var(--sidebar-wide);
+      background: var(--color-sidebar);
       color: var(--color-panel);
       display: flex;
       flex-direction: column;
-      align-items: center;
-      padding-block: var(--space-sm);
+      padding: var(--space-sm);
       border-inline-end: var(--rule-thin) solid var(--color-rule);
+      transition: width var(--dur-medium) var(--ease-out), transform var(--dur-medium) var(--ease-out);
     }
+    .brand-lockup { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; }
     .mark {
+      flex: 0 0 auto;
       width: 40px;
       height: 40px;
       display: grid;
@@ -60,40 +62,45 @@
       font-size: var(--text-md);
       font-weight: 850;
     }
-    .rail-nav { display: grid; gap: var(--space-xs); margin-block: var(--space-xl) auto; }
+    .brand-copy { min-width: 0; }
+    .brand-copy strong, .brand-copy span { display: block; overflow: hidden; text-overflow: ellipsis; }
+    .brand-copy strong { font-size: var(--text-sm); }
+    .brand-copy span { margin-block-start: 2px; color: var(--color-sidebar-muted); font-size: var(--text-xs); }
+    .rail-nav { display: grid; gap: var(--space-2xs); margin-block: var(--space-xl) auto; }
+    .nav-group { margin: var(--space-xs) var(--space-xs) var(--space-3xs); color: var(--color-sidebar-muted); font-size: .62rem; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; }
     .rail-link {
-      position: relative;
-      width: 44px;
+      width: 100%;
       height: 44px;
-      display: grid;
-      place-items: center;
+      display: flex;
+      align-items: center;
+      gap: var(--space-xs);
+      padding-inline: var(--space-xs);
       border-radius: var(--radius-control);
-      color: var(--color-rule-strong);
+      color: var(--color-sidebar-muted);
       text-decoration: none;
-      font-size: 1rem;
+      font-size: var(--text-xs);
+      font-weight: 700;
     }
     .rail-link[aria-current="page"] { background: var(--color-accent); color: var(--color-accent-ink); }
-    .rail-link .tip {
-      position: absolute;
-      inset-inline-start: 54px;
-      padding: var(--space-2xs) var(--space-xs);
-      background: var(--color-ink);
-      color: var(--color-panel);
-      border-radius: var(--radius-control);
-      opacity: 0;
-      pointer-events: none;
-      transform: translateX(-4px);
-      transition: opacity var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out);
-    }
+    .nav-icon { width: 20px; flex: 0 0 20px; text-align: center; font-size: 1rem; }
+    .nav-label { overflow: hidden; text-overflow: ellipsis; }
     @media (hover: hover) {
-      .rail-link:hover .tip { opacity: 1; transform: translateX(0); transition-delay: 800ms; }
+      .rail-link:hover { background: var(--color-ink-2); color: var(--color-panel); }
+      .rail-link[aria-current="page"]:hover { background: var(--color-accent); }
       .quiet-button:hover, .filter:hover { background: var(--color-panel-soft); }
       .queue-row:hover { background: var(--color-accent-soft); }
     }
-    .rail-link:focus-visible .tip { opacity: 1; transform: translateX(0); transition-delay: 0ms; }
-    .connection { width: 10px; height: 10px; border-radius: 50%; background: var(--color-safe); }
+    .rail-foot { display: flex; align-items: center; gap: var(--space-xs); color: var(--color-sidebar-muted); font-size: var(--text-xs); }
+    .connection { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%; background: var(--color-safe); }
 
-    .workspace { margin-inline-start: 72px; min-width: 0; }
+    .workspace { margin-inline-start: var(--sidebar-wide); min-width: 0; transition: margin var(--dur-medium) var(--ease-out); }
+    body.nav-collapsed .rail { width: var(--sidebar-compact); align-items: center; }
+    body.nav-collapsed .brand-copy,
+    body.nav-collapsed .nav-label,
+    body.nav-collapsed .nav-group,
+    body.nav-collapsed .rail-foot span { display: none; }
+    body.nav-collapsed .rail-link { width: 44px; justify-content: center; padding-inline: 0; }
+    body.nav-collapsed .workspace { margin-inline-start: var(--sidebar-compact); }
     .utility {
       position: sticky;
       inset-block-start: 0;
@@ -121,6 +128,7 @@
       transition: background var(--dur-short) var(--ease-out), transform var(--dur-short) var(--ease-out);
     }
     .quiet-button:active { transform: translateY(1px); }
+    .icon-button { width: 44px; padding: 0; display: grid; place-items: center; }
 
     .canvas { max-width: 1680px; margin-inline: auto; padding: clamp(var(--space-sm), 3vw, var(--space-xl)); }
     .brief {
@@ -239,7 +247,7 @@
     .priority-note { font-family: var(--font-mono); color: var(--color-accent); font-size: var(--text-xs); }
     .queue-columns, .queue-row {
       display: grid;
-      grid-template-columns: 106px minmax(145px, 1.05fr) minmax(150px, 1fr) 98px minmax(115px, .75fr) 110px 118px minmax(180px, 1.3fr);
+      grid-template-columns: 106px minmax(145px, 1.05fr) minmax(150px, 1fr) 98px minmax(115px, .75fr) 118px minmax(135px, .8fr) minmax(180px, 1.25fr);
       gap: var(--space-xs);
       align-items: center;
     }
@@ -259,6 +267,7 @@
       transition: background var(--dur-short) var(--ease-out);
     }
     .queue-row:last-child { border-block-end: 0; }
+    .queue-row > span { min-width: 0; overflow-wrap: anywhere; }
     .badge { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 6px 9px; border-radius: var(--radius-pill); font-size: .66rem; font-weight: 850; }
     .badge::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
     .badge.breached { color: var(--color-danger); background: var(--color-danger-soft); }
@@ -271,6 +280,8 @@
     .status { font-weight: 800; font-size: var(--text-xs); }
     .deadline { font-family: var(--font-mono); font-size: var(--text-xs); }
     .deadline.danger { color: var(--color-danger); font-weight: 800; }
+    .deadline.safe { color: var(--color-safe); font-weight: 800; }
+    .countdown { font-variant-numeric: tabular-nums; }
     .route { font-size: var(--text-xs); overflow-wrap: anywhere; }
     .route strong { color: var(--color-accent); }
     .empty { display: grid; place-items: center; min-height: 240px; padding: var(--space-xl); text-align: center; color: var(--color-muted); }
@@ -302,6 +313,19 @@
     .event b { display: block; font-size: var(--text-xs); }
     .event span { display: block; margin-block-start: 4px; color: var(--color-muted); font-size: var(--text-xs); }
 
+    body.tv-mode .rail { transform: translateX(-100%); }
+    body.tv-mode .workspace { margin-inline-start: 0; }
+    body.tv-mode .utility { min-height: 56px; }
+    body.tv-mode .breadcrumb,
+    body.tv-mode .brief,
+    body.tv-mode .command-strip,
+    body.tv-mode #navToggle { display: none; }
+    body.tv-mode .canvas { max-width: none; padding: var(--space-sm); }
+    body.tv-mode .pulse-board { margin-block-start: 0; }
+    body.tv-mode .queue-row { min-height: 78px; font-size: .9rem; }
+    body.tv-mode .queue-head { padding-block: var(--space-sm); }
+    body.tv-mode .utility-actions { width: 100%; justify-content: space-between; }
+
     @media (max-width: 72rem) {
       .pulse-board { grid-template-columns: 1fr; }
       .queue { overflow-x: auto; }
@@ -317,15 +341,15 @@
       .metric:nth-child(-n+2) { border-block-end: var(--rule-thin) solid var(--color-rule); }
     }
     @media (max-width: 40rem) {
-      .rail { position: static; width: 100%; height: 58px; padding: var(--space-2xs) var(--space-sm); flex-direction: row; justify-content: space-between; }
-      .rail-nav { display: flex; margin: 0; gap: var(--space-2xs); }
-      .rail-link { width: 40px; height: 40px; }
-      .rail-link .tip, .connection { display: none; }
+      .rail { transform: translateX(-100%); width: min(86vw, var(--sidebar-wide)); }
+      body.mobile-nav-open .rail { transform: translateX(0); }
       .workspace { margin-inline-start: 0; }
+      body.nav-collapsed .workspace { margin-inline-start: 0; }
       .utility { min-height: 56px; padding-inline: var(--space-sm); }
       .breadcrumb { display: none; }
       .utility-actions { width: 100%; justify-content: space-between; }
       .freshness { max-width: 50%; overflow: hidden; text-overflow: ellipsis; }
+      #navToggle { display: grid; }
       .canvas { padding: var(--space-sm); }
       .command-strip { position: static; grid-template-columns: 1fr; }
       .command-strip .search { grid-column: auto; }
@@ -343,21 +367,30 @@
 <body>
   <div class="shell">
     <aside class="rail" aria-label="Navigasi utama">
-      <div class="mark">IC</div>
+      <div class="brand-lockup">
+        <div class="mark">IC</div>
+        <div class="brand-copy"><strong>Inventory Tower</strong><span>CBT · Warehouse Control</span></div>
+      </div>
       <nav class="rail-nav">
-        <a class="rail-link" href="#" aria-label="Overview">⌂<span class="tip">Overview</span></a>
-        <a class="rail-link" href="/sra1-spatial-prototype.html?zone=SRA1&amp;variant=CB" aria-label="Spatial visibility">◇<span class="tip">3D Spatial</span></a>
-        <a class="rail-link" href="/putaway" aria-current="page" aria-label="Putaway monitoring">⇥<span class="tip">Putaway</span></a>
-        <a class="rail-link" href="#" aria-label="Lost monitoring">△<span class="tip">Lost</span></a>
+        <div class="nav-group">Control center</div>
+        <a class="rail-link" href="/putaway" aria-current="page"><span class="nav-icon">⇥</span><span class="nav-label">Putaway Monitoring</span></a>
+        <a class="rail-link" href="/sra1-spatial-prototype.html?zone=SRA1&amp;variant=CB"><span class="nav-icon">◇</span><span class="nav-label">3D Spatial Visibility</span></a>
+        <div class="nav-group">Inventory</div>
+        <a class="rail-link" href="#" aria-disabled="true"><span class="nav-icon">◎</span><span class="nav-label">Planogram Accuracy</span></a>
+        <a class="rail-link" href="#" aria-disabled="true"><span class="nav-icon">⌘</span><span class="nav-label">SKU Spread Analysis</span></a>
+        <div class="nav-group">Inventory risk</div>
+        <a class="rail-link" href="#" aria-disabled="true"><span class="nav-icon">△</span><span class="nav-label">Lost Monitoring</span></a>
       </nav>
-      <span class="connection" title="WMS connected"></span>
+      <div class="rail-foot"><span class="connection" title="WMS connected"></span><span>WMS connected</span></div>
     </aside>
 
     <main class="workspace">
       <header class="utility">
         <div class="breadcrumb">Inventory Control Tower / <strong>Putaway reporting</strong></div>
         <div class="utility-actions">
+          <button id="navToggle" class="quiet-button icon-button" type="button" aria-label="Sembunyikan atau tampilkan menu" aria-expanded="true">☰</button>
           <span id="freshness" class="freshness">Mengambil snapshot terbaru</span>
+          <button id="tvMode" class="quiet-button" type="button">▣ Mode TV</button>
           <button id="refresh" class="quiet-button" type="button">↻ Refresh</button>
         </div>
       </header>
@@ -407,11 +440,11 @@
 
         <section class="queue">
           <header class="queue-head">
-            <div><h2>Priority action queue</h2><p>Pending dahulu · deadline SLA terdekat · detail per Asset ID</p></div>
+            <div><h2>Priority action queue</h2><p>SLA berjalan dari DONE GR hingga Completed · deadline terdekat di atas</p></div>
             <span class="priority-note">LIVE QUEUE / CBT</span>
           </header>
           <div class="queue-columns" aria-hidden="true">
-            <span>Priority</span><span>Asset ID</span><span>Task / PO</span><span>Status</span><span>Owner</span><span>DONE GR</span><span>To SLA</span><span>Load / Destination</span>
+            <span>Priority</span><span>Asset ID</span><span>Task / PO</span><span>Status</span><span>Owner</span><span>DONE GRN</span><span>Sisa / Hasil SLA</span><span>Load / Destination</span>
           </div>
           <div id="queueBody" class="queue-body"></div>
         </section>
@@ -439,9 +472,53 @@
       const absolute = Math.abs(minutes);
       return `${Math.floor(absolute / 60)}j ${absolute % 60}m`;
     };
-    const effectiveSla = task => task.receivedAt ? task.sla : "GR_NOT_LINKED";
-    const labelSla = value => ({ BREACHED: "Breached", URGENT: "Urgent", AT_RISK: "At risk", SAFE: "Safe", GR_NOT_LINKED: "GR not linked" }[value] || value);
-    const badgeClass = value => ({ BREACHED: "breached", URGENT: "urgent", AT_RISK: "at-risk", SAFE: "safe", GR_NOT_LINKED: "unlinked" }[value] || "unlinked");
+    const isActive = task => task.status !== "COMPLETED";
+    const remainingSeconds = task => {
+      if (!task.receivedAt || !task.deadlineAt) return null;
+      if (task.status === "COMPLETED" && !task.completedAt) return null;
+      const stopAt = task.completedAt ? new Date(task.completedAt).getTime() : Date.now();
+      return Math.floor((new Date(task.deadlineAt).getTime() - stopAt) / 1000);
+    };
+    const classifySeconds = seconds => {
+      if (seconds == null) return "GR_NOT_LINKED";
+      if (seconds <= 0) return "BREACHED";
+      if (seconds <= 60 * 60) return "URGENT";
+      if (seconds <= 2 * 60 * 60) return "AT_RISK";
+      return "SAFE";
+    };
+    const effectiveSla = task => task.receivedAt
+      ? (isActive(task) ? classifySeconds(remainingSeconds(task)) : task.sla)
+      : "GR_NOT_LINKED";
+    const labelSla = value => ({ BREACHED: "Breached", URGENT: "Urgent", AT_RISK: "At risk", SAFE: "Safe", NOT_STARTED: "SLA unverified", GR_NOT_LINKED: "GR not linked" }[value] || value);
+    const badgeClass = value => ({ BREACHED: "breached", URGENT: "urgent", AT_RISK: "at-risk", SAFE: "safe", NOT_STARTED: "unlinked", GR_NOT_LINKED: "unlinked" }[value] || "unlinked");
+    const fmtClock = seconds => {
+      if (seconds == null) return "Awaiting GR";
+      const absolute = Math.abs(seconds);
+      const hours = Math.floor(absolute / 3600);
+      const minutes = Math.floor((absolute % 3600) / 60);
+      const secs = absolute % 60;
+      return `${hours}j ${String(minutes).padStart(2, "0")}m ${String(secs).padStart(2, "0")}d`;
+    };
+    const slaCopy = task => {
+      if (task.status === "COMPLETED" && !task.completedAt) {
+        return { main: "SLA belum terverifikasi", sub: "Completed time belum tersedia", tone: "" };
+      }
+      const seconds = remainingSeconds(task);
+      if (seconds == null) return { main: "Awaiting GR", sub: "SLA belum mulai", tone: "" };
+      if (task.status === "COMPLETED") {
+        const achieved = task.outcome === "ACHIEVED" || seconds >= 0;
+        return {
+          main: achieved ? `Achieved · ${fmtClock(seconds)}` : `Missed · +${fmtClock(seconds)}`,
+          sub: `Completed ${fmtTime(task.completedAt)}`,
+          tone: achieved ? "safe" : "danger"
+        };
+      }
+      return {
+        main: `${seconds < 0 ? "+" : "−"} ${fmtClock(seconds)}`,
+        sub: `Deadline ${fmtTime(task.deadlineAt)}`,
+        tone: seconds < 0 ? "danger" : "safe"
+      };
+    };
 
     function showSkeleton() {
       $("#queueBody").innerHTML = Array.from({ length: 6 }, () => '<div class="queue-row skeleton" aria-hidden="true"></div>').join("");
@@ -466,13 +543,16 @@
           to: first.to_rack_name || "—",
           vendor: task.vendor_name || task.inbound_status || "—",
           receivedAt: task.received_at || null,
+          completedAt: task.completed_at || null,
+          deadlineAt: task.sla_deadline_at || (task.received_at ? new Date(new Date(task.received_at).getTime() + 360 * 60000).toISOString() : null),
+          outcome: task.sla_outcome || null,
           items: task.items || [],
           searchable: [task.package_label, task.task_number, task.purchase_order_number, task.staff_name, task.vendor_name, ...(task.items || []).flatMap(item => [item.product_sku, item.product_name, item.from_rack_name, item.to_rack_name])].filter(Boolean).join(" ").toLowerCase()
         };
       }).sort((a, b) =>
-        (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9) ||
-        (slaOrder[effectiveSla(a)] ?? 9) - (slaOrder[effectiveSla(b)] ?? 9) ||
-        a.remain - b.remain
+        Number(isActive(b)) - Number(isActive(a)) ||
+        (remainingSeconds(a) ?? Number.MAX_SAFE_INTEGER) - (remainingSeconds(b) ?? Number.MAX_SAFE_INTEGER) ||
+        (statusOrder[a.status] ?? 9) - (statusOrder[b.status] ?? 9)
       );
     }
 
@@ -544,18 +624,33 @@
       }
       $("#queueBody").innerHTML = state.filtered.map(task => {
         const sla = effectiveSla(task);
-        const toSla = task.receivedAt ? `${task.remain < 0 ? "+" : "−"} ${fmtDuration(task.remain)}` : "Awaiting GR";
+        const clock = slaCopy(task);
+        const priorityLabel = task.status === "COMPLETED"
+          ? (task.outcome === "ACHIEVED" ? "Achieved" : task.outcome === "MISSED" ? "Missed" : labelSla(sla))
+          : labelSla(sla);
+        const priorityClass = task.outcome === "ACHIEVED" ? "safe" : task.outcome === "MISSED" ? "breached" : badgeClass(sla);
         return `<button class="queue-row" type="button" data-task-id="${task.id}">
-          <span class="badge ${badgeClass(sla)}">${labelSla(sla)}</span>
+          <span class="badge ${priorityClass}">${priorityLabel}</span>
           <span><span class="primary-id">${task.asset}</span><span class="subline">${task.vendor}</span></span>
           <span><span class="task-id">${task.task.slice(-14)}</span><span class="subline">${task.po.slice(-16)}</span></span>
           <span class="status">${task.status.replaceAll("_", " ")}</span>
           <span>${task.staff}<span class="subline">${task.staff === "Belum assign" ? "Needs owner" : "Assigned"}</span></span>
-          <span class="deadline">${fmtTime(task.receivedAt)}</span>
-          <span class="deadline ${task.remain < 0 ? "danger" : ""}">${toSla}<span class="subline">${task.receivedAt ? "Target +6 jam" : "SLA pending"}</span></span>
+          <span class="deadline">${fmtTime(task.receivedAt)}<span class="subline">${task.receivedAt ? "DONE GRN" : "Belum linked"}</span></span>
+          <span class="deadline countdown ${clock.tone}" data-countdown-id="${task.id}">${clock.main}<span class="subline">${clock.sub}</span></span>
           <span class="route">${task.sku} SKU · ${task.qty} pcs<span class="subline">${task.from.replace("CBT-", "")} → <strong>${task.to.replace("CBT-", "")}</strong></span></span>
         </button>`;
       }).join("");
+    }
+
+    function updateClocks() {
+      document.querySelectorAll("[data-countdown-id]").forEach(cell => {
+        const task = state.all.find(item => String(item.id) === cell.dataset.countdownId);
+        if (!task) return;
+        const clock = slaCopy(task);
+        cell.classList.toggle("danger", clock.tone === "danger");
+        cell.classList.toggle("safe", clock.tone === "safe");
+        cell.innerHTML = `${clock.main}<span class="subline">${clock.sub}</span>`;
+      });
     }
 
     function applyFilters() {
@@ -580,7 +675,8 @@
         <div class="timeline">
           <div class="event"><b>DONE GR</b><span>${fmtTime(task.receivedAt)}</span></div>
           <div class="event"><b>${task.status.replaceAll("_", " ")}</b><span>${task.staff} · elapsed ${fmtDuration(task.elapsed)}</span></div>
-          <div class="event"><b>Target SLA</b><span>${task.receivedAt ? fmtTime(new Date(new Date(task.receivedAt).getTime() + 360 * 60000)) : "Menunggu GR linkage"}</span></div>
+          <div class="event"><b>Target SLA</b><span>${task.deadlineAt ? fmtTime(task.deadlineAt) : "Menunggu GR linkage"}</span></div>
+          <div class="event"><b>Hasil SLA</b><span>${slaCopy(task).main}</span></div>
           <div class="event"><b>Destination</b><span>${task.from} → ${task.to}</span></div>
         </div>
         <strong>${task.sku} SKU · ${task.qty} pcs</strong>
@@ -635,6 +731,26 @@
     $("#status").addEventListener("change", applyFilters);
     $("#sla").addEventListener("change", applyFilters);
     $("#refresh").addEventListener("click", loadData);
+    $("#navToggle").addEventListener("click", () => {
+      const mobile = matchMedia("(max-width: 40rem)").matches;
+      document.body.classList.toggle(mobile ? "mobile-nav-open" : "nav-collapsed");
+      const expanded = mobile
+        ? document.body.classList.contains("mobile-nav-open")
+        : !document.body.classList.contains("nav-collapsed");
+      $("#navToggle").setAttribute("aria-expanded", String(expanded));
+      localStorage.setItem("inventory-nav-collapsed", String(!expanded));
+    });
+    $("#tvMode").addEventListener("click", async () => {
+      document.body.classList.toggle("tv-mode");
+      const active = document.body.classList.contains("tv-mode");
+      $("#tvMode").textContent = active ? "□ Exit TV" : "▣ Mode TV";
+      history.replaceState(null, "", active ? "?tv=1" : location.pathname);
+      if (active && document.documentElement.requestFullscreen) {
+        try { await document.documentElement.requestFullscreen(); } catch {}
+      } else if (!active && document.fullscreenElement) {
+        try { await document.exitFullscreen(); } catch {}
+      }
+    });
     $("#queueBody").addEventListener("click", event => {
       const row = event.target.closest("[data-task-id]");
       if (row) openTask(row.dataset.taskId);
@@ -643,7 +759,13 @@
     $("#detailDialog").addEventListener("click", event => {
       if (event.target === $("#detailDialog")) $("#detailDialog").close();
     });
+    if (localStorage.getItem("inventory-nav-collapsed") === "true") document.body.classList.add("nav-collapsed");
+    if (new URLSearchParams(location.search).get("tv") === "1") {
+      document.body.classList.add("tv-mode");
+      $("#tvMode").textContent = "□ Exit TV";
+    }
     loadData();
+    setInterval(updateClocks, 1000);
     setInterval(() => {
       if (!document.hidden && !$("#detailDialog").open) loadData();
     }, 30000);

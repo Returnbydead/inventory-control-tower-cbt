@@ -24,6 +24,23 @@ test("builds SLA summary and prioritizes breached tasks", () => {
   assert.equal(dashboard.summary.breached, 1);
   assert.equal(dashboard.summary.at_risk, 1);
   assert.equal(dashboard.tasks[0].task_id, 1);
+  assert.equal(dashboard.tasks[0].sla_deadline_at, "2026-07-26T06:00:00.000Z");
+  assert.equal(dashboard.tasks[0].sla_outcome, null);
+});
+
+test("freezes completed SLA at completion and exposes achieved outcome", () => {
+  const dashboard = buildDashboard([{
+    task_id: 7,
+    status: "COMPLETED",
+    received_at: "2026-07-26T00:00:00.000Z",
+    completed_at: "2026-07-26T05:30:00.000Z",
+    synced_at: "2026-07-27T07:00:00.000Z",
+  }], [], {
+    now: new Date("2026-07-27T07:00:00.000Z"),
+  });
+  assert.equal(dashboard.tasks[0].elapsed_minutes, 330);
+  assert.equal(dashboard.tasks[0].remaining_minutes, 30);
+  assert.equal(dashboard.tasks[0].sla_outcome, "ACHIEVED");
 });
 
 test("includes task item SKU, quantity, and racks", () => {

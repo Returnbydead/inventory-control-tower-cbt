@@ -49,7 +49,7 @@
     .status-COMPLIANT{background:#dff4ed;color:#087f73}.status-WRONG_L1{background:#fde8e5;color:#bd3434}
     .status-NO_TARGET{background:#fff1d9;color:#9a6313}.status-EXCLUDED{background:#eee7f8;color:#67439c}
     .hint{position:absolute;z-index:9;left:50%;bottom:26px;transform:translateX(-50%);padding:9px 13px;border-radius:999px;background:rgba(23,33,43,.86);color:#fff;font-size:11px;pointer-events:none}
-    .loading{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:#f6f8f6}
+    .loading{position:absolute;inset:0;z-index:30;display:grid;place-items:center;background:#f6f8f6;pointer-events:none}
     .loader-card{text-align:center}.spinner{width:34px;height:34px;border:3px solid #dce5e1;border-top-color:var(--teal);border-radius:50%;margin:0 auto 14px;animation:spin .8s linear infinite}
     @keyframes spin{to{transform:rotate(360deg)}}.error{color:#b63333}
     .switcher{position:fixed;z-index:50;bottom:18px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:6px;background:#17212b;color:#fff;border-radius:999px;box-shadow:0 12px 35px rgba(0,0,0,.25)}
@@ -163,6 +163,24 @@
     <button id="nextVariant" aria-label="Next variant">→</button>
   </nav>
 
+  <script>
+    // Navigation must work before the Three.js module and warehouse data finish loading.
+    (() => {
+      const trigger = document.getElementById("menuTrigger");
+      const menu = document.getElementById("appMenu");
+      trigger.addEventListener("click", event => {
+        event.stopPropagation();
+        const open = menu.classList.toggle("open");
+        trigger.setAttribute("aria-expanded", String(open));
+      });
+      addEventListener("click", event => {
+        if (!event.target.closest(".menu-wrap")) {
+          menu.classList.remove("open");
+          trigger.setAttribute("aria-expanded", "false");
+        }
+      });
+    })();
+  </script>
   <script type="importmap">
     {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
   </script>
@@ -177,17 +195,6 @@
     let variant = VARIANTS[query.get("variant")] ? query.get("variant") : "CB";
     document.body.dataset.variant = variant;
     const $ = (id) => document.getElementById(id);
-    $("menuTrigger").onclick=(event)=>{
-      event.stopPropagation();
-      const open=$("appMenu").classList.toggle("open");
-      $("menuTrigger").setAttribute("aria-expanded",String(open));
-    };
-    addEventListener("click",event=>{
-      if(!event.target.closest(".menu-wrap")){
-        $("appMenu").classList.remove("open");
-        $("menuTrigger").setAttribute("aria-expanded","false");
-      }
-    });
     function setVariant(next){
       variant=next; document.body.dataset.variant=next;
       $("variantLabel").textContent=`${next} — ${VARIANTS[next]}`;
