@@ -109,3 +109,14 @@ test("keeps every active task beyond the recent snapshot window", () => {
     [1, 3, 4],
   );
 });
+
+test("reserves detail capacity for active and completed backfill", () => {
+  const rows = [
+    { id: 1, status: "PENDING" },
+    { id: 2, status: "PENDING" },
+    { id: 3, status: "COMPLETED" },
+    { id: 4, status: "COMPLETED" },
+  ];
+  const selected = selectDetailRows(rows, new Map(), 2, 4);
+  assert.deepEqual(selected.map((row) => row.id), [1, 2, 3, 4]);
+});

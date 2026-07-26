@@ -203,20 +203,7 @@ function selectDetailRows(
 ) {
   const selected = [];
   const seen = new Set();
-  let newCompleted = 0;
-  const prioritizedRows = [...listRows].sort((left, right) => {
-    const leftPrevious = previous.get(Number(left.id));
-    const rightPrevious = previous.get(Number(right.id));
-    const leftNeedsBackfill = typeof leftPrevious === "object"
-      ? !leftPrevious.has_detail
-      : !leftPrevious;
-    const rightNeedsBackfill = typeof rightPrevious === "object"
-      ? !rightPrevious.has_detail
-      : !rightPrevious;
-    return Number(rightNeedsBackfill) - Number(leftNeedsBackfill);
-  });
-  for (const row of prioritizedRows) {
-    if (selected.length >= detailLimit) break;
+  const state = (row) => {
     const id = Number(row.id);
     const status = clean(row.status).toUpperCase();
     const prior = previous.get(id);
@@ -224,14 +211,45 @@ function selectDetailRows(
     const needsBackfill = typeof prior === "object"
       ? !prior.has_detail
       : !prior;
-    const active = ACTIVE_STATUSES.has(status);
-    const changed = Boolean(priorStatus && priorStatus !== status);
-    const newNonActive = !priorStatus && !active && newCompleted < newCompletedLimit;
-    const incompleteNonActive = !active && needsBackfill && newCompleted < newCompletedLimit;
-    if (active || changed || newNonActive || incompleteNonActive) {
-      if (!seen.has(id)) selected.push(row);
-      seen.add(id);
-      if (newNonActive || incompleteNonActive) newCompleted += 1;
+    return {
+      row,
+      id,
+      active: ACTIVE_STATUSES.has(status),
+      changed: Boolean(priorStatus && priorStatus !== status),
+      needsBackfill,
+    };
+  };
+  const candidates = listRows.map(state);
+  const add = (candidate) => {
+    if (selected.length >= detailLimit || seen.has(candidate.id)) return false;
+    selected.push(candidate.row);
+    seen.add(candidate.id);
+    return true;
+  };
+
+  // Status transitions are always the freshest operational signal.
+  for (const candidate of candidates.filter((item) => item.changed)) add(candidate);
+
+  // Reserve capacity for both sides so a large active queue cannot starve
+  // completed item/rack backfill indefinitely.
+  const completedCapacity = Math.min(
+    newCompletedLimit,
+    Math.max(0, detailLimit - selected.length),
+  );
+  const activeCapacity = Math.max(
+    0,
+    detailLimit - selected.length - completedCapacity,
+  );
+  let activeAdded = 0;
+  for (const candidate of candidates) {
+    if (candidate.active && candidate.needsBackfill && activeAdded < activeCapacity) {
+      if (add(candidate)) activeAdded += 1;
+    }
+  }
+  let completedAdded = 0;
+  for (const candidate of candidates) {
+    if (!candidate.active && candidate.needsBackfill && completedAdded < completedCapacity) {
+      if (add(candidate)) completedAdded += 1;
     }
   }
   return selected;
