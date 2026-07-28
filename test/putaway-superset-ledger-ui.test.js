@@ -70,6 +70,7 @@ test("keeps SLA, reconciliation, and exceptions readable at full width", () => {
   assert.match(html, /class="vertical-stack"/);
   assert.match(html, /id="slaBar"/);
   assert.doesNotMatch(html, /id="slaDonut"/);
+  assert.match(html, /class="section reconciliation-section" hidden/);
   assert.match(html, /const actionableExceptions = exceptionLabels\.filter/);
   assert.match(html, /Tidak ada exception aktif untuk filter ini\./);
 });
