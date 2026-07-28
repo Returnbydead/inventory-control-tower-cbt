@@ -6,19 +6,36 @@ const {
   evaluateCategory,
   targetFor,
 } = require("../lib/l1-placement");
-const { aggregateRows, summarize } = require("../api/rack-status")._test;
+const { aggregateRows, summarize, summarizeByZone, activateReadDatabase } = require("../api/rack-status")._test;
 
-test("uses rack sequence as bay and 07 as aisle", () => {
+test("read-only rack status only selects the existing database", async () => {
+  const calls = [];
+  await activateReadDatabase({ query: async sql => calls.push(sql) }, "inventory_cbt");
+  assert.deepEqual(calls, ["USE inventory_cbt"]);
+});
+
+test("all-zone summary groups locations without returning the detail payload", () => {
+  const grouped = summarizeByZone([
+    { zone: "SRA1", status: "COMPLIANT", qty: 10, wrong_qty: 0, stock_value: 100, wrong_value: 0 },
+    { zone: "SRA1", status: "WRONG_L1", qty: 5, wrong_qty: 5, stock_value: 50, wrong_value: 50 },
+    { zone: "MZA1", status: "NO_TARGET", qty: 2, wrong_qty: 0, stock_value: 20, wrong_value: 0 },
+  ]);
+  assert.equal(grouped.SRA1.compliant, 1);
+  assert.equal(grouped.SRA1.wrong_l1, 1);
+  assert.equal(grouped.MZA1.no_target, 1);
+});
+
+test("uses first rack number as aisle and second as sequence", () => {
   assert.deepEqual(addressParts("STL-SRA1-33-07-L2-C1"), {
     zone: "SRA1",
-    rackSequence: 33,
-    aisle: 7,
+    aisle: 33,
+    sequence: 7,
     rackLevel: 2,
     position: "C1",
   });
 });
 
-test("applies SRC rack sequence 18 Tata Rumah only to physical Aisle 13-17", () => {
+test("applies SRC aisle 18 Tata Rumah only to sequence 13-17", () => {
   assert.equal(
     evaluateCategory("CBT-SRC1-18-13-L2-01", "Tata Rumah").result,
     "COMPLIANT",

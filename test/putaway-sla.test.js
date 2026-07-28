@@ -94,6 +94,46 @@ test("normalizes completed PO GRN as Jakarta local time", () => {
   assert.equal(po.actual_qty, 23);
 });
 
+test("derives DONE GR time from completed inbound history when the API omits received_at", () => {
+  const po = normalizePurchaseOrderDetail({
+    data: {
+      id: 620305,
+      purchase_order_number: "ID1/POR/2026070000527893",
+      status: "COMPLETED",
+      destination_id: 819,
+      histories: [
+        {
+          activity_name: "RECEIVING",
+          start_date: "2026-07-26T08:45:00",
+          end_date: "2026-07-26T09:13:42",
+        },
+        {
+          activity_name: "COMPLETED",
+          start_date: "2026-07-26T09:13:42",
+        },
+      ],
+      items: [{ actual_quantity: 18 }],
+    },
+  });
+  assert.equal(po.received_at.toISOString(), "2026-07-26T02:13:42.000Z");
+});
+
+test("treats partially fulfilled inbound history as DONE GR", () => {
+  const po = normalizePurchaseOrderDetail({
+    data: {
+      id: 620306,
+      purchase_order_number: "ID1/POR/2026070000527894",
+      status: "PARTIALLY_FULFILLED",
+      destination_id: 819,
+      histories: [{
+        activity_name: "PARTIALLY_FULFILLED",
+        start_date: "2026-07-26T10:20:00",
+      }],
+    },
+  });
+  assert.equal(po.received_at.toISOString(), "2026-07-26T03:20:00.000Z");
+});
+
 test("prioritizes breached and missing-task GRN records", () => {
   assert.equal(priorityRank("BREACHED"), 0);
   assert.equal(priorityRank("URGENT", false), 1);

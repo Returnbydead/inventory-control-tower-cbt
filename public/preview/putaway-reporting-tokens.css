@@ -19,11 +19,14 @@
   --color-danger-soft: oklch(95% 0.035 27);
   --color-neutral-soft: oklch(95% 0.01 255);
   --color-shadow: oklch(20% 0.025 258 / 0.08);
+  --color-shadow-deep: oklch(20% 0.04 258 / 0.16);
+  --color-highlight: oklch(100% 0 0 / 0.22);
+  --color-backdrop: oklch(15% 0.025 258 / 0.55);
   --color-sidebar: oklch(20% 0.035 258);
   --color-sidebar-muted: oklch(76% 0.025 255);
 
   --font-display: "Space Grotesk", "Segoe UI", sans-serif;
-  --font-body: Inter, "Segoe UI", system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
   --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
 
   --space-3xs: 0.25rem;

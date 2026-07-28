@@ -46,9 +46,9 @@ The warehouse owner confirmed that Mezzanine A-F maps to physical MZA-MZF concep
 For standard mezzanine locations:
 
 ```text
-workbook gangway = rack address rack_sequence (first number after zone)
-physical Aisle = second number after zone
-allowed category applies to all physical Aisles, rack levels, and positions in that rack sequence
+workbook Aisle = first number after the zone
+rack sequence = second number after the zone
+allowed category applies to all rack sequences, rack levels, and positions in that Aisle
 ```
 
 ## 3. Proposed SPR mapping
@@ -61,7 +61,7 @@ The workbook SPR section contains:
 
 These counts exactly match the master rack aisle counts:
 
-| Workbook gangway family | Physical zone | Aisle range |
+| Workbook Aisle family | Physical zone | Aisle range |
 |---|---|---|
 | A | SRA1 | rack_sequence 01-14 |
 | B | SRB1 | rack_sequence 01-20 |
@@ -71,9 +71,9 @@ For SPR:
 
 ```text
 letter = physical SPR zone
-numeric workbook Aisle = rack address rack_sequence (first number after zone)
-physical Aisle = second number after zone
-allowed category applies to all physical Aisles, rack levels, and positions unless an Aisle exception is stated
+numeric workbook Aisle = first number after the zone
+rack sequence = second number after the zone
+allowed category applies to all rack sequences, rack levels, and positions unless a sequence exception is stated
 ```
 
 ## 4. Category normalization
@@ -106,7 +106,7 @@ Biskuit
 
 mean either `Snack` or `Biskuit` is compliant.
 
-### SRC1 rack sequence 18
+### SRC1 aisle 18
 
 The workbook states:
 
@@ -117,9 +117,9 @@ Tata Rumah (only bay 13-17)
 
 Confirmed interpretation:
 
-- `Perawatan Rumah` is allowed across SRC1 rack sequence 18.
-- `Tata Rumah` is allowed only on physical Aisle 13-17.
-- `Tata Rumah` outside physical Aisle 13-17 is non-compliant.
+- `Perawatan Rumah` is allowed across SRC1 aisle 18.
+- `Tata Rumah` is allowed only on rack sequence 13-17.
+- `Tata Rumah` outside rack sequence 13-17 is non-compliant.
 
 ### Blank SPR target rows
 

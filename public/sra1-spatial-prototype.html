@@ -219,34 +219,68 @@
     const controls=new OrbitControls(camera,renderer.domElement); controls.enableDamping=true; controls.dampingFactor=.07; controls.maxPolarAngle=Math.PI*.47; controls.minDistance=8; controls.maxDistance=105;
     scene.add(new THREE.HemisphereLight(0xffffff,0xdde5df,2.2));
     const sun=new THREE.DirectionalLight(0xffffff,2.2); sun.position.set(-18,28,12); sun.castShadow=true; scene.add(sun);
-    const floor=new THREE.Mesh(new THREE.PlaneGeometry(92,42),new THREE.MeshStandardMaterial({color:0xe9eeea,roughness:1}));
+    const floor=new THREE.Mesh(new THREE.PlaneGeometry(92,66),new THREE.MeshStandardMaterial({color:0xe9eeea,roughness:1}));
     floor.rotation.x=-Math.PI/2; floor.position.y=-.06; floor.receiveShadow=true; scene.add(floor);
-    const grid=new THREE.GridHelper(90,90,0xcfd8d2,0xdfe6e1);grid.position.y=-.04;scene.add(grid);
+    const grid=new THREE.GridHelper(90,90,0xcfd8d2,0xdfe6e1);grid.scale.z=.72;grid.position.y=-.04;scene.add(grid);
 
     const raycaster=new THREE.Raycaster(), pointer=new THREE.Vector2();
-    let cellMesh,palletMesh,cellRecords=[],palletRecords=[],baseCellColors=[],basePalletColors=[],activeAisle=null,aisleValues=[],sequenceValues=[];
+    let cellMesh,palletMesh,cellRecords=[],palletRecords=[],baseCellColors=[],basePalletColors=[],overviewMeshes=[],activeAisle=null,aisleValues=[],sequenceValues=[],positionValues=[],mezzanineRowsByDeckLevel=new Map(),mezzaninePositionsByDeckLevel=new Map();
     const colors={EMPTY:0xcbd4d2,COMPLIANT:0x27a67a,WRONG_L1:0xdc5050,NO_TARGET:0xd39a35,EXCLUDED:0x845ec2};
     const matrix=new THREE.Matrix4(), color=new THREE.Color();
 
-    function decodeMaster(master){
-      const zoneId=master.dictionaries.zone.indexOf(zone);
-      return master.locations.filter(r=>r[2]===zoneId).map(r=>({
-        rack_name:r[0], rack_sequence:Number(master.dictionaries.rack_sequence[r[3]]),
-        aisle:Number(master.dictionaries.aisle[r[4]]), level:Number(master.dictionaries.level[r[5]].replace("L","")),
-        position:Number(master.dictionaries.position[r[6]])
-      }));
-    }
     const isMezzanine=/^MZ[A-F][123]$/.test(zone);
     const mezzanineFloor=isMezzanine?Number(zone.at(-1)):null;
-    function aisleSpacing(){return isMezzanine?4.8:3.55}
+    const mezzanineModule=isMezzanine?zone.slice(0,3):null;
+    const moduleZones=isMezzanine?[1,2,3].map(floor=>`${mezzanineModule}${floor}`):[zone];
+    // One physical orange rack bank represents two aisles.  Keep clear gaps
+    // between banks so 18 physical racks do not visually merge into one block.
+    const mezzanineRackColumns=18, mezzanineRackRows=1, mezzanineRackPitchX=2.05, mezzanineRackSideOffset=.38, mezzanineRackHalfWidth=.62, mezzanineSlotPitch=.56, mezzanineDeckHeight=5.65;
+    function decodeMaster(master, zones=moduleZones){
+      const selected=new Set(zones);
+      return master.locations
+        .filter(r=>selected.has(master.dictionaries.zone[r[2]]))
+        .map(r=>({
+          rack_name:r[0], zone:master.dictionaries.zone[r[2]], rack_sequence:Number(master.dictionaries.aisle[r[4]]),
+          aisle:Number(master.dictionaries.rack_sequence[r[3]]), level:Number(master.dictionaries.level[r[5]].replace("L","")),
+          position:Number(master.dictionaries.position[r[6]])
+        }));
+    }
+    function aisleSpacing(){return isMezzanine?mezzanineRackPitchX:3.55}
+    function mezzanineRack(aisle){
+      const pair=Math.floor((aisle-1)/2), column=pair%mezzanineRackColumns;
+      return {x:(column-(mezzanineRackColumns-1)/2)*mezzanineRackPitchX,z:0,pair};
+    }
+    function mezzanineDeckY(floor){return (Number(floor)-1)*mezzanineDeckHeight}
+    function mezzanineSlotCount(deckZone, level){
+      return (mezzanineRowsByDeckLevel.get(`${deckZone}|${level}`)||[]).length*(mezzaninePositionsByDeckLevel.get(`${deckZone}|${level}`)||[]).length;
+    }
+    function mezzanineDeckDepth(){
+      return Math.max(12,...moduleZones.flatMap(deckZone=>[1,2,3,4,5].map(level=>mezzanineSlotCount(deckZone,level)*mezzanineSlotPitch+2.4)));
+    }
     function aisleX(aisle){
       const index=aisleValues.indexOf(aisle);
-      return (zone==="SRC1"?-1:1)*(index-(aisleValues.length-1)/2)*aisleSpacing();
+      return isMezzanine?mezzanineRack(aisle).x:(zone==="SRC1"?-1:1)*(index-(aisleValues.length-1)/2)*aisleSpacing();
     }
+    function aisleCenter(aisle, floor=mezzanineFloor){return isMezzanine?{...mezzanineRack(aisle),y:mezzanineDeckY(floor)}:{x:aisleX(aisle),y:0,z:0}}
     function coordinates(row){
+      if(isMezzanine){
+        const rack=mezzanineRack(row.aisle), side=(row.aisle-1)%2;
+        const deckRows=mezzanineRowsByDeckLevel.get(`${row.zone}|${row.level}`)||sequenceValues;
+        const levelPositions=mezzaninePositionsByDeckLevel.get(`${row.zone}|${row.level}`)||positionValues;
+        const sequenceIndex=deckRows.indexOf(row.rack_sequence), positionIndex=levelPositions.indexOf(row.position);
+        const slotIndex=sequenceIndex*levelPositions.length+positionIndex;
+        const slotCount=deckRows.length*levelPositions.length;
+        return {
+          x:rack.x+(side?1:-1)*mezzanineRackSideOffset,
+          y:mezzanineDeckY(Number(row.zone.at(-1)))+.26+(row.level-1)*.43,
+          z:(slotIndex-(slotCount-1)/2)*mezzanineSlotPitch
+        };
+      }
       const sequenceIndex=sequenceValues.indexOf(row.rack_sequence);
-      const positionOffset=(row.position-2)*.52*(zone==="SRC1"?-1:1);
-      return {x:aisleX(row.aisle)+positionOffset,y:.22+(row.level-1)*.48,z:(sequenceIndex-(sequenceValues.length-1)/2)*.78};
+      const positionIndex=positionValues.indexOf(row.position);
+      const positionOffset=(positionIndex-(positionValues.length-1)/2)*.48*(zone==="SRC1"?-1:1);
+      const center=aisleCenter(row.aisle);
+      return {x:center.x+positionOffset,y:.22+(row.level-1)*.48,z:center.z+(sequenceIndex-(sequenceValues.length-1)/2)*.78};
     }
     function fmt(n){return new Intl.NumberFormat("id-ID",{maximumFractionDigits:0}).format(n||0)}
     function kpiMarkup(label,value,note=""){return `<div class="kpi"><span>${label}</span><strong>${value}</strong><small>${note}</small></div>`}
@@ -256,20 +290,38 @@
       try{
         const [master,status]=await Promise.all([
           fetch("/data/master-rack-index.json").then(r=>r.json()),
-          fetch(`/api/rack-status?zone=${zone}`).then(r=>r.json())
+          fetch(isMezzanine?`/api/rack-status?zones=${moduleZones.join(",")}`:`/api/rack-status?zone=${zone}`).then(r=>r.json())
         ]);
         if(!status.ok)throw new Error(status.message||"Live SOH gagal dimuat");
         const rows=decodeMaster(master), statusMap=new Map(status.locations.map(x=>[x.rack_name,x]));
         aisleValues=[...new Set(rows.map(r=>r.aisle))].sort((a,b)=>a-b);
         sequenceValues=[...new Set(rows.map(r=>r.rack_sequence))].sort((a,b)=>a-b);
+        positionValues=[...new Set(rows.map(r=>r.position))].sort((a,b)=>a-b);
+        if(isMezzanine){
+          mezzanineRowsByDeckLevel=new Map(moduleZones.flatMap(deckZone=>[1,2,3,4,5].map(level=>[
+            `${deckZone}|${level}`,[...new Set(rows.filter(row=>row.zone===deckZone&&row.level===level).map(row=>row.rack_sequence))].sort((a,b)=>a-b)
+          ])));
+          mezzaninePositionsByDeckLevel=new Map(moduleZones.flatMap(deckZone=>[1,2,3,4,5].map(level=>[
+            `${deckZone}|${level}`,[...new Set(rows.filter(row=>row.zone===deckZone&&row.level===level).map(row=>row.position))].sort((a,b)=>a-b)
+          ])));
+          $("zoneCrumb").textContent=`${mezzanineModule} tower`;
+          $("zoneTitle").textContent=`${mezzanineModule} mezzanine tower`;
+        }
         const levels=[...new Set(rows.map(r=>r.level))];
         const footprint=zone==="SRC1"?" · stepped/L footprint":isMezzanine?` · mezzanine lantai ${mezzanineFloor} · aisle walkway`:"";
         $("zoneMeta").textContent=`${aisleValues.length} Aisle · ${sequenceValues.length} urutan rack · ${levels.length} level${footprint}. Pallet berwarna berarti SLOC memiliki SOH.`;
-        buildFootprint(rows); buildScene(rows,statusMap); renderSummary(rows,status); buildAisles(rows); updateFreshness(status.snapshot_at);
+        if(isMezzanine){
+          const rowProfile=moduleZones.map(deckZone=>{
+            const deckRows=[...new Set([1,2,3,4,5].flatMap(level=>mezzanineRowsByDeckLevel.get(`${deckZone}|${level}`)||[]))].sort((a,b)=>a-b);
+            return `${deckZone}: ${deckRows.length} row (${deckRows.join("–")||"-"})`;
+          }).join(" · ");
+          $("zoneMeta").textContent=`${Math.ceil(aisleValues.length/2)} rack fisik · ${aisleValues.length} aisle (2 aisle/rack) · ${levels.length} level · ${rowProfile}. Warna pallet dari SOH live.`;
+        }
+        buildFootprint(rows,statusMap); buildScene(rows,statusMap); renderSummary(rows,status); buildAisles(rows); updateFreshness(status.snapshot_at);
         loading.style.display="none";
       }catch(error){loading.innerHTML=`<div class="loader-card error"><strong>Preview gagal dimuat</strong><div class="sub">${error.message}</div></div>`}
     }
-    function buildFootprint(rows){
+    function buildFootprint(rows,statusMap){
       if(zone==="SRC1"){
         const material=new THREE.MeshStandardMaterial({color:0xdbe5df,roughness:1,transparent:true,opacity:.92});
         [rows.filter(r=>r.aisle>=13),rows.filter(r=>r.aisle<=12)].forEach(section=>{
@@ -279,20 +331,67 @@
           pad.position.set((minX+maxX)/2,-.01,(minZ+maxZ)/2);pad.receiveShadow=true;scene.add(pad);
         });
       }
-      if(isMezzanine&&aisleValues.length>1){
-        const points=rows.map(coordinates),zs=points.map(p=>p.z);
-        const depth=Math.max(...zs)-Math.min(...zs)+1.7,centerZ=(Math.min(...zs)+Math.max(...zs))/2;
-        const walkwayMaterial=new THREE.MeshStandardMaterial({color:0xd7c5a8,roughness:1});
-        for(let index=0;index<aisleValues.length-1;index++){
-          const centerX=(aisleX(aisleValues[index])+aisleX(aisleValues[index+1]))/2;
-          const walkway=new THREE.Mesh(new THREE.BoxGeometry(2.15,.055,depth),walkwayMaterial);
-          walkway.position.set(centerX,.015,centerZ);walkway.receiveShadow=true;scene.add(walkway);
+      if(isMezzanine)buildMezzanineStructure(rows,statusMap);
+    }
+    function buildMezzanineStructure(rows,statusMap){
+      const deckWidth=(mezzanineRackColumns-1)*mezzanineRackPitchX+2.5, deckDepth=mezzanineDeckDepth();
+      const steel=new THREE.MeshStandardMaterial({color:0x2d3740,roughness:.72,metalness:.18});
+      const deck=new THREE.MeshStandardMaterial({color:0xd9deda,roughness:.94});
+      const orange=new THREE.MeshStandardMaterial({color:0xf26b21,roughness:.54,metalness:.1});
+      const green=new THREE.MeshStandardMaterial({color:0x4aae71,roughness:.72});
+      const aisleLane=new THREE.MeshStandardMaterial({color:0xbcc6c0,roughness:1,transparent:true,opacity:.82});
+      const heatEmpty=new THREE.MeshStandardMaterial({color:0xd6dfd8,roughness:.84});
+      const heatActive=new THREE.MeshStandardMaterial({color:0x3aab88,roughness:.64});
+      const heatIssue=new THREE.MeshStandardMaterial({color:0xd9534f,roughness:.64});
+      const box=(w,h,d,material,x,y,z)=>{const mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;scene.add(mesh);return mesh};
+      for(let floorIndex=1;floorIndex<=3;floorIndex++){
+        const y=mezzanineDeckY(floorIndex);
+        const deckZone=`${mezzanineModule}${floorIndex}`;
+        const deckRows=rows.filter(row=>row.zone===deckZone);
+        const deckAisles=[...new Set(deckRows.map(row=>row.aisle))].sort((a,b)=>a-b);
+        const rackCount=Math.ceil(deckAisles.length/2);
+        const levelValues=[...new Set(deckRows.map(row=>row.level))].sort((a,b)=>a-b);
+        const activeDepth=Math.max(12,...levelValues.map(level=>mezzanineSlotCount(deckZone,level)*mezzanineSlotPitch+1.2));
+        box(deckWidth,.28,activeDepth,deck,0,y-.22,0);
+        box(deckWidth+.36,.13,.15,steel,0,y+.02,-activeDepth/2);box(deckWidth+.36,.13,.15,steel,0,y+.02,activeDepth/2);
+        box(.15,.13,activeDepth+.36,steel,-deckWidth/2,y+.02,0);box(.15,.13,activeDepth+.36,steel,deckWidth/2,y+.02,0);
+        for(let pair=0;pair<rackCount;pair++){
+          const {x,z}=mezzanineRack(deckAisles[pair*2]||pair*2+1);
+          // A clear centre lane + two aisle channels show the two-aisle rack
+          // rather than a single dense orange rectangle.
+          box(mezzanineRackHalfWidth*2,.025,activeDepth-.68,aisleLane,x,y+.055,z);
+          [-mezzanineRackHalfWidth,mezzanineRackHalfWidth].forEach(offset=>{
+            box(.12,2.3,.12,steel,x+offset,y+1.06,-(activeDepth-.55)/2);box(.12,2.3,.12,steel,x+offset,y+1.06,(activeDepth-.55)/2);
+          });
+          levelValues.forEach(level=>{
+            const rowValues=mezzanineRowsByDeckLevel.get(`${deckZone}|${level}`)||[];
+            const levelPositions=mezzaninePositionsByDeckLevel.get(`${deckZone}|${level}`)||[];
+            const slotCount=rowValues.length*levelPositions.length;
+            rowValues.forEach((rowValue,index)=>{
+              const rowCenter=(index*levelPositions.length+(levelPositions.length-1)/2-(slotCount-1)/2)*mezzanineSlotPitch;
+              const rowDepth=Math.max(.22,levelPositions.length*mezzanineSlotPitch-.18);
+              // Each green master row is its own rack section.  The intentional
+              // gap is the cross gangway, preventing a continuous orange block.
+              [-mezzanineRackHalfWidth,mezzanineRackHalfWidth].forEach(offset=>box(.085,.1,rowDepth,orange,x+offset,y+.28+(level-1)*.43,rowCenter));
+              box(.025,.025,rowDepth,steel,x,y+.085+(level-1)*.43,rowCenter);
+              box(mezzanineRackHalfWidth*2-.16,.035,.12,green,x,y+.065+(level-1)*.43,rowCenter);
+              const sectionRows=deckRows.filter(row=>row.level===level&&row.rack_sequence===rowValue&&(Math.floor((row.aisle-1)/2)===pair));
+              const liveRows=sectionRows.map(row=>statusMap.get(row.rack_name)).filter(Boolean);
+              const material=liveRows.some(row=>row.status==="WRONG_L1")?heatIssue:(liveRows.length?heatActive:heatEmpty);
+              const heat=box(mezzanineRackHalfWidth*2-.24,.035,rowDepth-.1,material,x,y+.105+(level-1)*.43,rowCenter);
+              heat.userData.kind="mezzanine-overview";overviewMeshes.push(heat);
+              if(pair===0&&index<rowValues.length-1){
+                const gangwayZ=((index+1)*levelPositions.length-slotCount/2)*mezzanineSlotPitch;
+                box(deckWidth-.6,.016,.22,aisleLane,0,y+.075+(level-1)*.43,gangwayZ);
+              }
+            });
+          });
         }
       }
     }
     function buildScene(rows,statusMap){
       const cellGeometry=new THREE.BoxGeometry(.44,.34,.56), palletGeometry=new THREE.BoxGeometry(.36,.25,.46);
-      cellMesh=new THREE.InstancedMesh(cellGeometry,new THREE.MeshStandardMaterial({roughness:.82,metalness:.02,transparent:true,opacity:.42}),rows.length);
+      cellMesh=new THREE.InstancedMesh(cellGeometry,new THREE.MeshStandardMaterial({roughness:.82,metalness:.02,transparent:true,opacity:isMezzanine ? .055 : .42}),rows.length);
       const occupied=rows.filter(r=>statusMap.has(r.rack_name));
       palletMesh=new THREE.InstancedMesh(palletGeometry,new THREE.MeshStandardMaterial({roughness:.66,metalness:.01}),occupied.length);
       rows.forEach((row,i)=>{const p=coordinates(row),status=statusFor(row,statusMap);matrix.makeTranslation(p.x,p.y,p.z);cellMesh.setMatrixAt(i,matrix);color.setHex(status==="EMPTY"?colors.EMPTY:0x80908c);cellMesh.setColorAt(i,color);baseCellColors[i]=color.clone();cellRecords[i]={...row,status,live:statusMap.get(row.rack_name)||null,p}});
@@ -300,6 +399,7 @@
       cellMesh.instanceMatrix.needsUpdate=true;cellMesh.instanceColor.needsUpdate=true;palletMesh.instanceMatrix.needsUpdate=true;palletMesh.instanceColor.needsUpdate=true;
       cellMesh.userData.kind="cell";palletMesh.userData.kind="pallet";scene.add(cellMesh,palletMesh);
       resetCamera();
+      applyVisibility();
     }
     function renderSummary(rows,status){
       const empty=rows.length-status.summary.occupied;
@@ -325,30 +425,38 @@
     function focusAisle(aisle,button){
       activeAisle=activeAisle===aisle?null:aisle;document.querySelectorAll(".aisle-btn").forEach(b=>b.classList.toggle("active",Number(b.dataset.aisle)===activeAisle));
       applyVisibility();
-      if(activeAisle){const x=aisleX(activeAisle);controls.target.set(x,1.3,0);camera.position.set(x+9,8,14)}
+      if(activeAisle){const center=aisleCenter(activeAisle);controls.target.set(center.x,center.y+1.3,center.z);camera.position.set(center.x+11,center.y+8,center.z+17)}
       else resetCamera();
     }
     function resetCamera(){
-      const width=Math.max(aisleValues.length*aisleSpacing(),22),depth=Math.max(sequenceValues.length*.78,12);
-      if(zone==="SRC1")camera.position.set(width*.58,Math.max(21,width*.46),depth*1.85);
-      else camera.position.set(width*.62,Math.max(18,width*.42),Math.max(24,depth*1.65));
-      controls.target.set(0,1.4,zone==="SRC1"?1.5:0);controls.update()
+      const width=isMezzanine?Math.max((mezzanineRackColumns-1)*mezzanineRackPitchX+2.5,22):Math.max(aisleValues.length*aisleSpacing(),22);
+      const depth=isMezzanine?mezzanineDeckDepth():Math.max(sequenceValues.length*.78,12);
+      if(isMezzanine){
+        camera.position.set(width*1.02,20.5,depth*1.2);controls.target.set(0,mezzanineDeckHeight,0);
+      }else if(zone==="SRC1"){
+        camera.position.set(width*.58,Math.max(21,width*.46),depth*1.85);controls.target.set(0,1.4,1.5);
+      }else{
+        camera.position.set(width*.62,Math.max(18,width*.42),Math.max(24,depth*1.65));controls.target.set(0,1.4,0);
+      }
+      controls.update()
     }
     $("resetView").onclick=()=>{activeAisle=null;document.querySelectorAll(".aisle-btn").forEach(b=>b.classList.remove("active"));currentFilter="ALL";document.querySelectorAll(".control").forEach(b=>b.classList.toggle("active",b.dataset.filter==="ALL"));applyVisibility();resetCamera()}
     let currentFilter="ALL";
     document.querySelectorAll(".control").forEach(btn=>btn.onclick=()=>{currentFilter=btn.dataset.filter;document.querySelectorAll(".control").forEach(b=>b.classList.toggle("active",b===btn));applyVisibility()});
     function applyVisibility(){
       const emptyMode=currentFilter==="EMPTY";
-      cellMesh.material.opacity=emptyMode ? .9 : (currentFilter==="ALL" ? .42 : .28);
+      cellMesh.material.opacity=emptyMode ? .9 : (currentFilter==="ALL" ? (isMezzanine ? .055 : .42) : (isMezzanine ? .18 : .28));
+      const showMezzanineOverview=isMezzanine&&!activeAisle&&currentFilter==="ALL";
+      overviewMeshes.forEach(mesh=>mesh.visible=showMezzanineOverview);
       cellRecords.forEach((r,i)=>{
         const visible=(!activeAisle||r.aisle===activeAisle)&&(currentFilter==="ALL"||r.status===currentFilter);
-        const scale=visible?1:.001;
+        const scale=visible&&(!isMezzanine||!showMezzanineOverview)?1:.001;
         matrix.makeScale(scale,scale,scale);matrix.setPosition(r.p.x,r.p.y,r.p.z);cellMesh.setMatrixAt(i,matrix);
         cellMesh.setColorAt(i,emptyMode&&visible?new THREE.Color(0x657b82):baseCellColors[i]);
       });
       palletRecords.forEach((r,i)=>{
         const visible=(!activeAisle||r.aisle===activeAisle)&&(currentFilter==="ALL"||r.status===currentFilter);
-        const scale=visible?1:.001;
+        const scale=visible&&(!isMezzanine||!showMezzanineOverview)?1:.001;
         matrix.makeScale(scale,scale,scale);matrix.setPosition(r.p.x,r.p.y+.02,r.p.z);palletMesh.setMatrixAt(i,matrix);
         palletMesh.setColorAt(i,basePalletColors[i]);
       });

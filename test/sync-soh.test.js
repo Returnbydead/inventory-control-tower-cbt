@@ -8,11 +8,11 @@ const {
   supersetPayload,
 } = require("../api/sync-soh")._test;
 
-test("parses STL rack structure using position 33 and aisle 07", () => {
+test("parses STL rack structure using aisle 33 and sequence 07", () => {
   assert.deepEqual(deriveRack("STL-SRA1-33-07-L2-C1"), {
     zone: "SRA1",
-    rack_sequence: "33",
-    aisle: "07",
+    aisle: "33",
+    rack_sequence: "07",
     level: "L2",
   });
 });
@@ -20,8 +20,8 @@ test("parses STL rack structure using position 33 and aisle 07", () => {
 test("parses CBT mezzanine location", () => {
   assert.deepEqual(deriveRack("CBT-MZE1-03-05-L2-05"), {
     zone: "MZE1",
-    rack_sequence: "03",
-    aisle: "05",
+    aisle: "03",
+    rack_sequence: "05",
     level: "L2",
   });
 });
@@ -43,7 +43,7 @@ test("normalizes numeric inventory values", () => {
   });
   assert.equal(row.stock, 12);
   assert.equal(row.stock_value, 45000);
-  assert.equal(row.aisle, "07");
+  assert.equal(row.aisle, "33");
 });
 
 test("requests up to 100000 rows from Superset", () => {

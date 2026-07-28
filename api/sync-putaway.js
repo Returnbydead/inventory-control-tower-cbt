@@ -16,6 +16,7 @@ const {
 
 const ACTIVE_STATUSES = new Set(["PENDING", "IN_PROGRESS"]);
 const DETAIL_CONCURRENCY = 6;
+const ACTIVE_DETAIL_MAX_AGE_MINUTES = 15;
 
 function clean(value) {
   return String(value ?? "").trim();
@@ -154,7 +155,7 @@ async function mapConcurrent(values, concurrency, mapper) {
   return result;
 }
 
-function mergeTask(listRow, detailPayload) {
+function mergeTask(listRow, detailPayload, stored = {}) {
   const detail = detailPayload ? normalizePutawayDetail(detailPayload) : {};
   return {
     task_id: Number(listRow.id),
@@ -166,12 +167,14 @@ function mergeTask(listRow, detailPayload) {
     location_id: Number(detail.location_id || listRow.location_id),
     location_name: clean(detail.location_name || listRow.location_name),
     status: clean(detail.status || listRow.status).toUpperCase(),
-    staff_name: clean(detail.staff_name || listRow.staff_name),
+    staff_name: clean(detail.staff_name || listRow.staff_name || stored.staff_name),
     inbound_date: clean(listRow.inbound_date),
-    pending_at: detail.pending_at || null,
-    in_progress_at: detail.in_progress_at || null,
-    completed_at: detail.completed_at || null,
-    activities_json: detail.activities ? JSON.stringify(detail.activities) : null,
+    pending_at: detail.pending_at || stored.pending_at || null,
+    in_progress_at: detail.in_progress_at || stored.in_progress_at || null,
+    completed_at: detail.completed_at || stored.completed_at || null,
+    activities_json: detail.activities
+      ? JSON.stringify(detail.activities)
+      : stored.activities_json || null,
   };
 }
 
@@ -200,6 +203,8 @@ function selectDetailRows(
   previous,
   newCompletedLimit = 20,
   detailLimit = 40,
+  now = new Date(),
+  activeDetailMaxAgeMinutes = ACTIVE_DETAIL_MAX_AGE_MINUTES,
 ) {
   const selected = [];
   const seen = new Set();
@@ -211,12 +216,19 @@ function selectDetailRows(
     const needsBackfill = typeof prior === "object"
       ? !prior.has_detail
       : !prior;
+    const priorSyncedAt = typeof prior === "object" ? new Date(prior?.synced_at || 0) : null;
+    const staleActive = ACTIVE_STATUSES.has(status)
+      && (!priorSyncedAt || Number.isNaN(priorSyncedAt.getTime())
+        || now.getTime() - priorSyncedAt.getTime() >= activeDetailMaxAgeMinutes * 60_000);
     return {
       row,
       id,
       active: ACTIVE_STATUSES.has(status),
       changed: Boolean(priorStatus && priorStatus !== status),
+      forceDetail: Boolean(row.force_detail),
       needsBackfill,
+      staleActive,
+      priorSyncedAt,
     };
   };
   const candidates = listRows.map(state);
@@ -227,8 +239,14 @@ function selectDetailRows(
     return true;
   };
 
-  // Status transitions are always the freshest operational signal.
-  for (const candidate of candidates.filter((item) => item.changed)) add(candidate);
+  // Explicit stale candidates and status transitions are always the freshest
+  // operational signal. Stale candidates can come from the stored queue when
+  // they are no longer present in the bounded WMS list response.
+  for (const candidate of candidates
+    .filter((item) => item.forceDetail || item.changed)
+    .sort((left, right) => Number(right.forceDetail) - Number(left.forceDetail))) {
+    add(candidate);
+  }
 
   // Reserve capacity for both sides so a large active queue cannot starve
   // completed item/rack backfill indefinitely.
@@ -241,8 +259,11 @@ function selectDetailRows(
     detailLimit - selected.length - completedCapacity,
   );
   let activeAdded = 0;
-  for (const candidate of candidates) {
-    if (candidate.active && candidate.needsBackfill && activeAdded < activeCapacity) {
+  const activeCandidates = candidates
+    .filter((candidate) => candidate.active && (candidate.needsBackfill || candidate.staleActive))
+    .sort((left, right) => left.priorSyncedAt - right.priorSyncedAt);
+  for (const candidate of activeCandidates) {
+    if (activeAdded < activeCapacity) {
       if (add(candidate)) activeAdded += 1;
     }
   }
@@ -260,6 +281,30 @@ function selectSnapshotRows(listRows, recentLimit = 100) {
     const status = clean(row.status).toUpperCase();
     return index < recentLimit || ACTIVE_STATUSES.has(status);
   });
+}
+
+function selectPoNumbersForRefresh(tasks, stored = new Map(), limit = 75) {
+  const candidates = [];
+  const seen = new Set();
+  const ordered = [...tasks].sort((left, right) => {
+    const leftActive = ACTIVE_STATUSES.has(clean(left.status).toUpperCase());
+    const rightActive = ACTIVE_STATUSES.has(clean(right.status).toUpperCase());
+    return Number(rightActive) - Number(leftActive);
+  });
+  for (const task of ordered) {
+    const poNumber = clean(task.purchase_order_number);
+    if (
+      candidates.length >= limit
+      || seen.has(poNumber)
+      || !/^ID1\/PO[RX]\//i.test(poNumber)
+    ) continue;
+    const current = stored.get(poNumber);
+    if (!current || !current.received_at) {
+      candidates.push(poNumber);
+      seen.add(poNumber);
+    }
+  }
+  return candidates;
 }
 
 async function replaceTaskRows(client, tasks, detailedTaskIds, items, runId, listComplete) {
@@ -400,32 +445,73 @@ async function executeSync(runId) {
     // pages to retain operational PENDING/IN_PROGRESS tasks, while the heavier
     // detail and item calls remain bounded below.
     const maxPages = Number(process.env.WMS_PUTAWAY_MAX_PAGES || 10);
+    const detailLimit = Math.max(1, Number(process.env.WMS_DETAIL_BATCH_LIMIT || 10));
+    const staleActiveDetailLimit = Math.min(
+      detailLimit,
+      Math.max(1, Number(process.env.WMS_STALE_ACTIVE_DETAIL_LIMIT || 5)),
+    );
+    const staleActiveMaxAgeMinutes = Math.max(
+      1,
+      Number(process.env.WMS_ACTIVE_DETAIL_MAX_AGE_MINUTES || ACTIVE_DETAIL_MAX_AGE_MINUTES),
+    );
     const fetchedList = await fetchPutawayTasks({ maxPages });
     const list = {
       rows: selectSnapshotRows(fetchedList.rows),
       // This is an operational subset, not a full historical snapshot.
       complete: false,
     };
-    const existing = list.rows.length
+    const listTaskIds = new Set(list.rows.map((row) => Number(row.id)));
+    const staleCutoff = new Date(
+      Date.now() - staleActiveMaxAgeMinutes * 60_000,
+    ).toISOString();
+    // The WMS list is deliberately bounded for a fast live sync. Re-add a
+    // small oldest-first slice of stored active work so it cannot stay stale
+    // forever when it falls outside that list window.
+    const staleActive = await client.query(`
+      SELECT
+        task_id AS id, task_number, purchase_order_number, package_label,
+        location_id, location_name, status, staff_name, inbound_date,
+        pending_at, in_progress_at, completed_at, activities_json, synced_at
+      FROM putaway_tasks_current
+      WHERE location_id = $1
+        AND status IN ('PENDING', 'IN_PROGRESS')
+        AND (synced_at IS NULL OR synced_at <= $2)
+      ORDER BY synced_at ASC
+      LIMIT $3
+    `, [CBT_LOCATION_ID, staleCutoff, staleActiveDetailLimit]);
+    const staleRows = staleActive.rows
+      .filter((row) => !listTaskIds.has(Number(row.id)))
+      .map((row) => ({ ...row, force_detail: true }));
+    const sourceRows = [...list.rows, ...staleRows];
+    const existing = sourceRows.length
       ? await client.query(
-        `SELECT task_id, status,
+        `SELECT task_id, status, staff_name, pending_at, in_progress_at,
+          completed_at, activities_json, synced_at,
           CASE WHEN activities_json IS NOT NULL THEN TRUE ELSE FALSE END AS has_detail
         FROM putaway_tasks_current
         WHERE task_id = ANY($1::BIGINT[])`,
-        [list.rows.map((row) => Number(row.id))],
+        [sourceRows.map((row) => Number(row.id))],
       )
       : { rows: [] };
     const previous = new Map(
       existing.rows.map((row) => [Number(row.task_id), {
         status: clean(row.status).toUpperCase(),
         has_detail: Boolean(row.has_detail),
+        staff_name: clean(row.staff_name),
+        pending_at: row.pending_at || null,
+        in_progress_at: row.in_progress_at || null,
+        completed_at: row.completed_at || null,
+        activities_json: row.activities_json || null,
+        synced_at: row.synced_at || null,
       }]),
     );
     const detailRows = selectDetailRows(
-      list.rows,
+      sourceRows,
       previous,
       Number(process.env.WMS_NEW_COMPLETED_DETAIL_LIMIT || 5),
-      Number(process.env.WMS_DETAIL_BATCH_LIMIT || 10),
+      detailLimit,
+      new Date(),
+      staleActiveMaxAgeMinutes,
     );
 
     const detailBundles = await mapConcurrent(
@@ -442,16 +528,34 @@ async function executeSync(runId) {
     const bundleById = new Map(
       detailBundles.map((bundle) => [bundle.taskId, bundle]),
     );
-    const tasks = list.rows.map((row) => mergeTask(row, bundleById.get(Number(row.id))?.detail));
+    const tasks = sourceRows.map((row) => mergeTask(
+      row,
+      bundleById.get(Number(row.id))?.detail,
+      previous.get(Number(row.id)),
+    ));
     const items = detailBundles.flatMap((bundle) =>
       bundle.items.map((item) => normalizeItem(bundle.taskId, item)),
     );
 
-    const detailedTaskIds = new Set(detailBundles.map((bundle) => bundle.taskId));
-    const poNumbers = [...new Set(tasks
-      .filter((task) => detailedTaskIds.has(task.task_id))
+    const candidatePoNumbers = [...new Set(tasks
       .map((task) => task.purchase_order_number)
       .filter((number) => /^ID1\/PO[RX]\//i.test(number)))];
+    const storedPoResult = candidatePoNumbers.length
+      ? await client.query(`
+        SELECT purchase_order_number, received_at
+        FROM inbound_po_current
+        WHERE purchase_order_number = ANY($1::VARCHAR[])
+      `, [candidatePoNumbers])
+      : { rows: [] };
+    const storedPos = new Map(storedPoResult.rows.map((row) => [
+      clean(row.purchase_order_number),
+      { received_at: row.received_at || null },
+    ]));
+    const poNumbers = selectPoNumbersForRefresh(
+      tasks,
+      storedPos,
+      Number(process.env.WMS_PO_REFRESH_LIMIT || 75),
+    );
     const poList = await fetchPurchaseOrders({
       targetNumbers: poNumbers,
       maxPages: Number(process.env.WMS_PO_MAX_PAGES || 30),
@@ -535,6 +639,7 @@ module.exports._test = {
   normalizeItem,
   mapConcurrent,
   selectDetailRows,
+  selectPoNumbersForRefresh,
   selectSnapshotRows,
   replacePurchaseOrders,
 };

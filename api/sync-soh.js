@@ -204,12 +204,12 @@ function asNumber(value) {
 
 function deriveRack(rackName) {
   const rack = clean(rackName).toUpperCase();
-  if (!rack) return { zone: "", rack_sequence: "", aisle: "", level: "" };
+  if (!rack) return { zone: "", aisle: "", rack_sequence: "", level: "" };
   const parts = rack.split("-");
   return {
     zone: parts[1] || "",
-    rack_sequence: parts[2] || "",
-    aisle: parts[3] || "",
+    aisle: parts[2] || "",
+    rack_sequence: parts[3] || "",
     level: parts.find((part) => /^L\d+$/.test(part)) || "",
   };
 }

@@ -6,6 +6,7 @@ const {
   normalizeItem,
   mapConcurrent,
   selectDetailRows,
+  selectPoNumbersForRefresh,
   selectSnapshotRows,
 } = require("../api/sync-putaway")._test;
 
@@ -36,6 +37,22 @@ test("merges list and detail task fields", () => {
   assert.equal(task.status, "COMPLETED");
   assert.equal(task.package_label, "ATI/1");
   assert.equal(task.staff_name, "Dani");
+});
+
+test("preserves stored activity timestamps when a task is not in the current detail batch", () => {
+  const task = mergeTask({
+    id: 101,
+    status: "PENDING",
+    task_number: "ID1/PUT/101",
+  }, null, {
+    staff_name: "Operator",
+    pending_at: "2026-07-26T00:02:00.000Z",
+    activities_json: '[{"activity_name":"PENDING"}]',
+  });
+
+  assert.equal(task.pending_at, "2026-07-26T00:02:00.000Z");
+  assert.equal(task.staff_name, "Operator");
+  assert.equal(task.activities_json, '[{"activity_name":"PENDING"}]');
 });
 
 test("normalizes WIMS item rack and SKU fields", () => {
@@ -81,6 +98,21 @@ test("details a task whenever its stored status changes", () => {
   assert.equal(selected.length, 1);
 });
 
+test("rechecks a stale active task even when its list status has not changed", () => {
+  const selected = selectDetailRows(
+    [{ id: 1011470, status: "IN_PROGRESS" }],
+    new Map([[1011470, {
+      status: "IN_PROGRESS",
+      has_detail: true,
+      synced_at: "2026-07-26T15:56:19.385Z",
+    }]]),
+    0,
+    1,
+    new Date("2026-07-27T14:26:18.925Z"),
+  );
+  assert.deepEqual(selected.map((row) => row.id), [1011470]);
+});
+
 test("backfills a stored completed task that still has no detail", () => {
   const selected = selectDetailRows(
     [
@@ -119,4 +151,20 @@ test("reserves detail capacity for active and completed backfill", () => {
   ];
   const selected = selectDetailRows(rows, new Map(), 2, 4);
   assert.deepEqual(selected.map((row) => row.id), [1, 2, 3, 4]);
+});
+
+test("retries PO linkage for active tasks until DONE GR is available", () => {
+  const tasks = [
+    { status: "PENDING", purchase_order_number: "ID1/POR/1" },
+    { status: "IN_PROGRESS", purchase_order_number: "ID1/POR/2" },
+    { status: "COMPLETED", purchase_order_number: "ID1/POR/3" },
+  ];
+  const stored = new Map([
+    ["ID1/POR/1", { received_at: null }],
+    ["ID1/POR/2", { received_at: "2026-07-26T02:00:00.000Z" }],
+  ]);
+  assert.deepEqual(selectPoNumbersForRefresh(tasks, stored), [
+    "ID1/POR/1",
+    "ID1/POR/3",
+  ]);
 });

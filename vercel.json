@@ -3,7 +3,7 @@
   "redirects": [
     {
       "source": "/putaway",
-      "destination": "/preview/putaway-reporting-redesign.html",
+      "destination": "/preview/putaway-superset-ledger.html?live=1",
       "permanent": false
     },
     {
@@ -12,9 +12,21 @@
       "permanent": false
     }
   ],
+  "rewrites": [
+    {
+      "source": "/occupancy",
+      "destination": "/preview/occupancy-dashboard-preview.html"
+    }
+  ],
   "functions": {
     "api/sync-soh.js": {
       "maxDuration": 300
+    },
+    "api/rack-status.js": {
+      "maxDuration": 60
+    },
+    "api/occupancy-dashboard.js": {
+      "maxDuration": 60
     },
     "api/sync-putaway.js": {
       "maxDuration": 300

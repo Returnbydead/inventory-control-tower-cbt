@@ -1,0 +1,65 @@
+:root {
+  --color-paper: oklch(96.8% 0.008 225);
+  --color-panel: oklch(100% 0.004 225);
+  --color-panel-soft: oklch(98.2% 0.007 225);
+  --color-panel-muted: oklch(94.5% 0.012 225);
+  --color-ink: oklch(22% 0.022 245);
+  --color-ink-2: oklch(38% 0.024 245);
+  --color-muted: oklch(47% 0.022 245);
+  --color-rule: oklch(88% 0.012 225);
+  --color-rule-strong: oklch(76% 0.02 225);
+  --color-accent: oklch(63% 0.15 213);
+  --color-accent-strong: oklch(45% 0.15 213);
+  --color-accent-soft: oklch(94% 0.04 213);
+  --color-accent-ink: oklch(12% 0.026 225);
+  --color-warning: oklch(83% 0.14 88);
+  --color-warning-soft: oklch(93% 0.075 88);
+  --color-safe: oklch(66% 0.12 156);
+  --color-safe-soft: oklch(94% 0.045 156);
+  --color-safe-mid: oklch(87% 0.07 156);
+  --color-danger: oklch(57% 0.2 29);
+  --color-danger-soft: oklch(94% 0.04 29);
+  --color-sidebar: oklch(20% 0.035 245);
+  --color-sidebar-2: oklch(26% 0.04 245);
+  --color-sidebar-muted: oklch(75% 0.024 230);
+  --color-focus: oklch(52% 0.18 213);
+  --color-shadow: oklch(20% 0.03 245 / 0.08);
+  --color-backdrop: oklch(18% 0.025 245 / 0.52);
+
+  --font-display: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "Cascadia Code", Consolas, monospace;
+
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4rem;
+
+  --text-2xs: 0.66rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.35rem;
+  --text-kpi: clamp(2.25rem, 4vw, 4.75rem);
+
+  --radius-control: 0.35rem;
+  --radius-panel: 0.5rem;
+  --radius-pill: 999px;
+  --rule-thin: 1px;
+  --rule-strong: 2px;
+  --sidebar-wide: 15rem;
+  --sidebar-compact: 4.25rem;
+  --topbar-height: 4rem;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-short: 140ms;
+  --dur-medium: 240ms;
+}
