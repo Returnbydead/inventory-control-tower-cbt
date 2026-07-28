@@ -49,7 +49,7 @@ test("stacks the operational reporting tables at full reading width", () => {
 test("covers the seven operational reporting areas", () => {
   for (const label of [
     "Task, Quantity, SKU, PO &amp; Asset",
-    "SLA Health",
+    "Output &amp; SLA",
     "Selisih Qty Inbound vs Task",
     "Exception Board",
     "Manpower Workload",
@@ -69,6 +69,8 @@ test("uses explicit quantity-reconciliation labels instead of ambiguous variance
 test("keeps SLA, reconciliation, and exceptions readable at full width", () => {
   assert.match(html, /class="vertical-stack"/);
   assert.match(html, /id="slaBar"/);
+  assert.match(html, /id="completedTaskCount"/);
+  assert.match(html, /SLA tercapai/);
   assert.doesNotMatch(html, /id="slaDonut"/);
   assert.match(html, /class="section reconciliation-section" hidden/);
   assert.match(html, /const actionableExceptions = exceptionLabels\.filter/);

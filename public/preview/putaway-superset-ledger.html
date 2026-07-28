@@ -365,16 +365,15 @@
         <div class="vertical-stack">
           <section class="section sla-section">
             <header class="section-heading">
-              <h2>SLA Health</h2>
-              <span>Official task SLA + quantity-weighted view</span>
+              <h2>Output &amp; SLA</h2>
+              <span>Task Putaway PO hari ini</span>
             </header>
             <div class="section-body sla-layout">
               <div class="sla-overview">
-                <div class="sla-score"><span>Task selesai dalam SLA</span><strong id="slaTaskPercent">0%</strong><small id="slaTaskFact">0 / 0 completed task</small></div>
-                <div class="sla-quantity"><span>Quantity selesai dalam SLA</span><strong id="slaQtyFact">0%</strong><small>Secondary view · quantity weighted</small></div>
+                <div class="sla-score"><span>Output completed</span><strong id="completedTaskCount">0 task</strong><small id="completedTaskFact">0% dari task dalam scope</small></div>
+                <div class="sla-quantity"><span>SLA tercapai</span><strong id="slaTaskPercent">0%</strong><small id="slaTaskFact">0 dari 0 task selesai dalam SLA</small></div>
               </div>
               <div class="sla-track" role="img" aria-label="SLA task belum dimuat"><span id="slaBar"></span></div>
-              <div id="slaStates" class="sla-states"></div>
             </div>
           </section>
 
@@ -571,19 +570,19 @@
 
       const completedSla = payload.sla_breakdown?.completed || {};
       const taskPercent = numberValue(completedSla.task_percent);
+      const completedCount = numberValue(completedSla.within_task_count) + numberValue(completedSla.late_task_count);
+      const statusRows = payload.status_breakdown || {};
+      const scopeTaskCount = ["pending", "in_progress", "completed"].reduce(
+        (sum, key) => sum + numberValue(statusRows[key]?.task_count),
+        0,
+      );
+      const completedPercent = scopeTaskCount ? (completedCount / scopeTaskCount) * 100 : 0;
       document.querySelector("#slaBar").style.width = `${Math.max(0, Math.min(100, taskPercent))}%`;
-      document.querySelector(".sla-track").setAttribute("aria-label", `Official task SLA ${taskPercent.toFixed(1)} percent`);
+      document.querySelector(".sla-track").setAttribute("aria-label", `SLA tercapai ${taskPercent.toFixed(1)} persen`);
+      document.querySelector("#completedTaskCount").textContent = `${integer.format(completedCount)} task`;
+      document.querySelector("#completedTaskFact").textContent = `${completedPercent.toFixed(1)}% dari task dalam scope`;
       document.querySelector("#slaTaskPercent").textContent = `${taskPercent.toFixed(1)}%`;
-      document.querySelector("#slaTaskFact").textContent = `${integer.format(numberValue(completedSla.within_task_count))} / ${integer.format(numberValue(completedSla.within_task_count) + numberValue(completedSla.late_task_count))} completed task`;
-      document.querySelector("#slaQtyFact").textContent = `${numberValue(completedSla.qty_percent).toFixed(1)}%`;
-      const activeSla = payload.sla_breakdown?.active || {};
-      document.querySelector("#slaStates").innerHTML = [
-        ["safe", "SAFE"],
-        ["at_risk", "AT RISK"],
-        ["urgent", "URGENT"],
-        ["breached", "BREACHED"],
-        ["not_started", "NOT STARTED"],
-      ].map(([key, label]) => `<div class="sla-state"><span>${label}</span><strong>${integer.format(numberValue(activeSla[key]?.task_count))}</strong><span>${integer.format(numberValue(activeSla[key]?.qty))} qty</span></div>`).join("");
+      document.querySelector("#slaTaskFact").textContent = `${integer.format(numberValue(completedSla.within_task_count))} dari ${integer.format(completedCount)} task selesai dalam SLA`;
 
       const reconciliation = payload.reconciliation || { rows: [] };
       document.querySelector("#reconciliationSummary").innerHTML = [
