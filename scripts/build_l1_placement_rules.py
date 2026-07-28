@@ -63,14 +63,14 @@ def main() -> None:
         if family not in spr_zone:
             continue
         categories_allowed, excluded = allowed(sheet.cell(row, 3).value)
-        # The workbook calls this "Aisle", but the confirmed rack address
-        # structure maps it to the first number after zone: rack_sequence.
-        key = f"{spr_zone[family]}:{int(rack_sequence):02d}"
+        # The workbook Aisle maps to the first number after the zone.
+        aisle = int(str(gangway).rsplit("-", 1)[1])
+        key = f"{spr_zone[family]}:{aisle:02d}"
         rules[key] = {
             "allowed": categories_allowed,
             "excluded": excluded,
             "source": f"SPR {gangway}",
-            "bay_allowed": {},
+            "sequence_allowed": {},
         }
 
     blocks = [
@@ -106,7 +106,7 @@ def main() -> None:
                     f"Mezzanine {module} floor {current_floor} "
                     f"rack sequence {int(rack_sequence_value)}"
                 ),
-                "bay_allowed": {},
+                "sequence_allowed": {},
             }
 
     tata_rumah = canonical[norm("Tata Rumah")]
@@ -115,8 +115,8 @@ def main() -> None:
         category for category in src18["allowed"]
         if category != tata_rumah
     ]
-    src18["bay_allowed"] = {
-        str(bay): [tata_rumah] for bay in range(13, 18)
+    src18["sequence_allowed"] = {
+        str(sequence): [tata_rumah] for sequence in range(13, 18)
     }
 
     payload = {

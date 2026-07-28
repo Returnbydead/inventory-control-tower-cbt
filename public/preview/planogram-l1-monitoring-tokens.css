@@ -1,0 +1,55 @@
+/* Hallmark · macrostructure: Operational Catalogue · tone: utilitarian · anchor hue: operational blue
+ * theme: studied-DNA (source: Putaway Operational Ledger) · audience: warehouse inventory control
+ * nav: operational-sidebar · footer: none · contrast: pass (40-41)
+ */
+:root {
+  --paper: oklch(98% 0.008 235);
+  --paper-2: oklch(95.5% 0.012 235);
+  --paper-3: oklch(92% 0.016 235);
+  --surface: oklch(99.4% 0.004 235);
+  --ink: oklch(20% 0.025 245);
+  --ink-2: oklch(43% 0.028 245);
+  --rule: oklch(84% 0.02 235);
+  --rule-strong: oklch(71% 0.035 235);
+  --accent: oklch(62% 0.15 225);
+  --accent-strong: oklch(48% 0.14 225);
+  --accent-soft: oklch(93% 0.035 225);
+  --accent-ink: oklch(16% 0.04 235);
+  --safe: oklch(56% 0.13 155);
+  --safe-soft: oklch(93% 0.04 155);
+  --warning: oklch(72% 0.14 78);
+  --warning-soft: oklch(95% 0.05 78);
+  --danger: oklch(57% 0.19 28);
+  --danger-soft: oklch(94% 0.035 28);
+  --focus: oklch(46% 0.18 225);
+  --sidebar: oklch(18% 0.035 245);
+  --sidebar-ink: oklch(96% 0.015 235);
+  --sidebar-muted: oklch(76% 0.03 235);
+  --sheet-header: oklch(24% 0.05 205);
+  --sheet-header-ink: oklch(99% 0.004 235);
+  --sheet-rule: oklch(32% 0.035 225);
+  --overlay-shadow: oklch(20% 0.025 245 / .2);
+  --space-3xs: .125rem;
+  --space-2xs: .25rem;
+  --space-xs: .5rem;
+  --space-sm: .75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2.5rem;
+  --font-display: "Geist", ui-sans-serif, sans-serif;
+  --font-body: "Geist", ui-sans-serif, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --text-xs: .8rem;
+  --text-sm: .9rem;
+  --text-base: 1rem;
+  --text-md: 1.25rem;
+  --text-lg: 1.5625rem;
+  --radius: .375rem;
+  --control-height: 2.75rem;
+  --sidebar-width: 18.75rem;
+  --ease-out: cubic-bezier(.16, 1, .3, 1);
+  --ease-in: cubic-bezier(.7, 0, .84, 0);
+  --ease-in-out: cubic-bezier(.65, 0, .35, 1);
+  --dur-short: 180ms;
+  --z-sticky: 200;
+}

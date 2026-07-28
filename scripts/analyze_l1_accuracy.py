@@ -92,7 +92,7 @@ for row in range(3, 111):
         "allowed": categories,
         "excluded": excluded,
         "source": f"SPR {gangway}",
-        "bay_allowed": {},
+        "sequence_allowed": {},
     }
 
 # Mezzanine A-F. Module D floor 3 is physically HRA3/HRB3.
@@ -130,14 +130,14 @@ for module, level_col, aisle_col, category_col, business_zone_col in blocks:
             "allowed": categories,
             "excluded": excluded,
             "source": f"Mezzanine {module} floor {current_floor} aisle {aisle_value}",
-            "bay_allowed": {},
+        "sequence_allowed": {},
         }
 
-# Confirmed exception: Tata Rumah is allowed only on SRC1 aisle 18 bays 13-17.
+# Confirmed exception: Tata Rumah is allowed only on SRC1 aisle 18 sequences 13-17.
 src18 = rules[("SRC1", 18)]
 src18["allowed"].discard(canonical_by_norm[norm("Tata Rumah")])
-for bay in range(13, 18):
-    src18["bay_allowed"][bay] = {canonical_by_norm[norm("Tata Rumah")]}
+for sequence in range(13, 18):
+    src18["sequence_allowed"][sequence] = {canonical_by_norm[norm("Tata Rumah")]}
 
 
 address_pattern = re.compile(
@@ -158,7 +158,7 @@ def target_for(rack_name: str) -> tuple[str, set[str], str]:
     if parts is None:
         return "NO_TARGET", set(), ""
 
-    zone, aisle, bay, _, _ = parts
+    zone, aisle, sequence, _, _ = parts
     rule = rules.get((zone, aisle))
     if rule is None:
         return "NO_TARGET", set(), ""
@@ -166,7 +166,7 @@ def target_for(rack_name: str) -> tuple[str, set[str], str]:
         return "EXCLUDED", set(), rule["source"]
 
     allowed = set(rule["allowed"])
-    allowed.update(rule["bay_allowed"].get(bay, set()))
+    allowed.update(rule["sequence_allowed"].get(sequence, set()))
     if not allowed:
         return "NO_TARGET", set(), rule["source"]
     return "MAPPED", allowed, rule["source"]

@@ -1,0 +1,60 @@
+:root {
+  --color-paper: oklch(98.5% 0.008 255);
+  --color-panel: oklch(100% 0 0);
+  --color-panel-soft: oklch(97% 0.012 255);
+  --color-ink: oklch(21% 0.035 258);
+  --color-ink-2: oklch(42% 0.035 258);
+  --color-muted: oklch(55% 0.025 258);
+  --color-rule: oklch(89% 0.016 255);
+  --color-rule-strong: oklch(78% 0.025 255);
+  --color-accent: oklch(53% 0.22 260);
+  --color-accent-soft: oklch(94% 0.035 260);
+  --color-accent-ink: oklch(100% 0 0);
+  --color-focus: oklch(48% 0.2 260);
+  --color-safe: oklch(49% 0.13 158);
+  --color-safe-soft: oklch(95% 0.035 158);
+  --color-risk: oklch(64% 0.15 74);
+  --color-risk-soft: oklch(96% 0.04 84);
+  --color-danger: oklch(56% 0.21 27);
+  --color-danger-soft: oklch(95% 0.035 27);
+  --color-neutral-soft: oklch(95% 0.01 255);
+  --color-shadow: oklch(20% 0.025 258 / 0.08);
+  --color-shadow-deep: oklch(20% 0.04 258 / 0.16);
+  --color-highlight: oklch(100% 0 0 / 0.22);
+  --color-backdrop: oklch(15% 0.025 258 / 0.55);
+  --color-sidebar: oklch(20% 0.035 258);
+  --color-sidebar-muted: oklch(76% 0.025 255);
+
+  --font-display: "Space Grotesk", "Segoe UI", sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4rem;
+
+  --text-xs: 0.72rem;
+  --text-sm: 0.84rem;
+  --text-md: 1rem;
+  --text-lg: 1.24rem;
+  --text-xl: 1.75rem;
+  --text-display: clamp(2rem, 3vw, 3.5rem);
+
+  --radius-control: 0.5rem;
+  --radius-panel: 0.75rem;
+  --radius-pill: 999px;
+  --rule-thin: 1px;
+  --sidebar-wide: 15.5rem;
+  --sidebar-compact: 4.5rem;
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-short: 140ms;
+  --dur-medium: 240ms;
+}
