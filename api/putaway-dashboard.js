@@ -3,6 +3,7 @@ const { calculateSla, priorityRank } = require("../lib/putaway-sla");
 
 const ALLOWED_STATUS = new Set(["PENDING", "IN_PROGRESS", "COMPLETED"]);
 const ALLOWED_SLA = new Set(["SAFE", "AT_RISK", "URGENT", "BREACHED", "NOT_STARTED"]);
+const ACTIVE_STATUSES = new Set(["PENDING", "IN_PROGRESS"]);
 
 function clean(value) {
   return String(value ?? "").trim();
@@ -17,6 +18,22 @@ function iso(value) {
   if (!value) return null;
   const date = value instanceof Date ? value : new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function jakartaDateKey(value) {
+  if (!value) return "";
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jakarta",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function isSalesOrder(value) {
+  return /^INV\/SO\//i.test(clean(value));
 }
 
 function rackZone(rackName) {
@@ -113,7 +130,9 @@ function buildDashboard(taskRows, itemRows, {
     const completedAt = iso(row.completed_at);
     const inboundReceivedAt = iso(row.received_at);
     const pendingAt = iso(row.pending_at);
-    const doneGrAt = inboundReceivedAt || pendingAt;
+    // Operational SLA starts at the WMS PENDING activity. PO/GR data is a
+    // fallback only when that history has not been retrieved yet.
+    const doneGrAt = pendingAt || inboundReceivedAt;
     const slaResult = calculateSla({
       grnAt: doneGrAt,
       completedAt,
@@ -132,7 +151,7 @@ function buildDashboard(taskRows, itemRows, {
       in_progress_at: iso(row.in_progress_at),
       completed_at: completedAt,
       received_at: doneGrAt,
-      done_gr_source: inboundReceivedAt ? "INBOUND_PO" : pendingAt ? "PUTAWAY_PENDING" : null,
+      done_gr_source: pendingAt ? "PUTAWAY_PENDING" : inboundReceivedAt ? "INBOUND_PO" : null,
       grn_number: clean(row.grn_number) || null,
       inbound_status: clean(row.inbound_status) || null,
       vendor_name: clean(row.vendor_name) || null,
@@ -148,7 +167,18 @@ function buildDashboard(taskRows, itemRows, {
     };
   });
 
-  let filtered = allTasks;
+  // Direct-sales tasks (INV/SO) are out of scope for the Putaway SLA ledger.
+  // Active POR work is kept regardless of age so an old breach remains visible;
+  // completed work is deliberately a Jakarta-today operational report.
+  const operationalTasks = allTasks.filter((task) =>
+    !isSalesOrder(task.purchase_order_number)
+    && (
+      ACTIVE_STATUSES.has(task.status)
+      || (task.status === "COMPLETED" && jakartaDateKey(task.completed_at) === jakartaDateKey(now))
+    )
+  );
+
+  let filtered = operationalTasks;
   if (status) filtered = filtered.filter((task) => task.status === status);
   if (sla) filtered = filtered.filter((task) => task.sla_state === sla);
   if (vendor) filtered = filtered.filter((task) => clean(task.vendor_name).toLowerCase() === vendor.toLowerCase());
@@ -362,7 +392,7 @@ function buildDashboard(taskRows, itemRows, {
     || right.task_id - left.task_id,
   );
 
-  const snapshotAt = allTasks.reduce(
+  const snapshotAt = operationalTasks.reduce(
     (latest, task) => task.synced_at && (!latest || task.synced_at > latest)
       ? task.synced_at
       : latest,
@@ -372,6 +402,12 @@ function buildDashboard(taskRows, itemRows, {
     snapshot_at: snapshotAt,
     official_sla_minutes: 360,
     clock_basis: "24x7 calendar time",
+    scope: {
+      active_statuses: ["PENDING", "IN_PROGRESS"],
+      completed_window: "TODAY_ASIA_JAKARTA",
+      excluded_po_prefix: "INV/SO/",
+      done_gr_basis: "WMS_PENDING_ACTIVITY",
+    },
     summary,
     status_breakdown: statusBreakdown,
     sla_breakdown: slaBreakdown,
@@ -381,9 +417,9 @@ function buildDashboard(taskRows, itemRows, {
     reconciliation,
     exceptions,
     filters: {
-      vendors: [...new Set(allTasks.map((task) => task.vendor_name).filter(Boolean))].sort(),
-      staff: [...new Set(allTasks.map((task) => task.staff_name).filter(Boolean))].sort(),
-      zones: [...new Set(allTasks.flatMap((task) => task.zones).filter((value) => value !== "UNMAPPED"))].sort(),
+      vendors: [...new Set(operationalTasks.map((task) => task.vendor_name).filter(Boolean))].sort(),
+      staff: [...new Set(operationalTasks.map((task) => task.staff_name).filter(Boolean))].sort(),
+      zones: [...new Set(operationalTasks.flatMap((task) => task.zones).filter((value) => value !== "UNMAPPED"))].sort(),
     },
     total_filtered: filtered.length,
     active_task_count: activeTasks.length,

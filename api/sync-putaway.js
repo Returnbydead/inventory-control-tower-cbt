@@ -205,6 +205,7 @@ function selectDetailRows(
   detailLimit = 40,
   now = new Date(),
   activeDetailMaxAgeMinutes = ACTIVE_DETAIL_MAX_AGE_MINUTES,
+  activeDetailLimit = detailLimit,
 ) {
   const selected = [];
   const seen = new Set();
@@ -254,9 +255,9 @@ function selectDetailRows(
     newCompletedLimit,
     Math.max(0, detailLimit - selected.length),
   );
-  const activeCapacity = Math.max(
-    0,
-    detailLimit - selected.length - completedCapacity,
+  const activeCapacity = Math.min(
+    activeDetailLimit,
+    Math.max(0, detailLimit - selected.length - completedCapacity),
   );
   let activeAdded = 0;
   const activeCandidates = candidates
@@ -442,7 +443,18 @@ async function executeSync(runId) {
     const maxPages = Number.isFinite(configuredMaxPages)
       ? Math.min(200, Math.max(1, configuredMaxPages))
       : 200;
-    const detailLimit = Math.max(1, Number(process.env.WMS_DETAIL_BATCH_LIMIT || 10));
+    // The operational ledger needs every active task item for a credible SLA,
+    // manpower, and destination-rack view. Completed item backfill stays
+    // bounded because the dashboard reports completed work only for today.
+    const activeDetailLimit = Math.max(
+      1,
+      Number(process.env.WMS_ACTIVE_DETAIL_LIMIT || 250),
+    );
+    const completedDetailLimit = Math.max(
+      0,
+      Number(process.env.WMS_NEW_COMPLETED_DETAIL_LIMIT || 50),
+    );
+    const detailLimit = activeDetailLimit + completedDetailLimit;
     const staleActiveDetailLimit = Math.min(
       detailLimit,
       Math.max(1, Number(process.env.WMS_STALE_ACTIVE_DETAIL_LIMIT || 5)),
@@ -503,10 +515,11 @@ async function executeSync(runId) {
     const detailRows = selectDetailRows(
       sourceRows,
       previous,
-      Number(process.env.WMS_NEW_COMPLETED_DETAIL_LIMIT || 5),
+      completedDetailLimit,
       detailLimit,
       new Date(),
       staleActiveMaxAgeMinutes,
+      activeDetailLimit,
     );
 
     const detailBundles = await mapConcurrent(
@@ -534,7 +547,7 @@ async function executeSync(runId) {
 
     const candidatePoNumbers = [...new Set(tasks
       .map((task) => task.purchase_order_number)
-      .filter((number) => /^ID1\/PO[RX]\//i.test(number)))];
+      .filter((number) => /^ID1\/POR\//i.test(number)))];
     const storedPoResult = candidatePoNumbers.length
       ? await client.query(`
         SELECT purchase_order_number, received_at

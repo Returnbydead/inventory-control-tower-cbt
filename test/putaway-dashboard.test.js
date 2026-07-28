@@ -36,7 +36,7 @@ test("freezes completed SLA at completion and exposes achieved outcome", () => {
     completed_at: "2026-07-26T05:30:00.000Z",
     synced_at: "2026-07-27T07:00:00.000Z",
   }], [], {
-    now: new Date("2026-07-27T07:00:00.000Z"),
+    now: new Date("2026-07-26T07:00:00.000Z"),
   });
   assert.equal(dashboard.tasks[0].elapsed_minutes, 330);
   assert.equal(dashboard.tasks[0].remaining_minutes, 30);
@@ -82,6 +82,7 @@ test("summarizes DONE GR quantity, distinct SKU, and distinct PO", () => {
       status: "COMPLETED",
       purchase_order_number: "ID1/POR/2",
       received_at: null,
+      completed_at: "2026-07-26T00:45:00.000Z",
     },
   ], [
     { task_item_id: 11, task_id: 1, product_sku: "SKU-A", qty: 10 },
@@ -108,6 +109,44 @@ test("uses the Putaway PENDING activity as a transparent GR fallback", () => {
   assert.equal(dashboard.tasks[0].done_gr_source, "PUTAWAY_PENDING");
   assert.equal(dashboard.tasks[0].elapsed_minutes, 60);
   assert.equal(dashboard.tasks[0].sla_state, "SAFE");
+});
+
+test("keeps active POR work, excludes INV/SO, and limits completed reporting to Jakarta today", () => {
+  const dashboard = buildDashboard([
+    {
+      task_id: 1,
+      status: "PENDING",
+      purchase_order_number: "ID1/POR/ACTIVE",
+      pending_at: "2026-07-28T15:00:00.000Z",
+    },
+    {
+      task_id: 2,
+      status: "IN_PROGRESS",
+      purchase_order_number: "INV/SO/20260729/819/1",
+      pending_at: "2026-07-28T15:00:00.000Z",
+    },
+    {
+      task_id: 3,
+      status: "COMPLETED",
+      purchase_order_number: "ID1/POR/TODAY",
+      pending_at: "2026-07-28T14:00:00.000Z",
+      completed_at: "2026-07-28T17:30:00.000Z",
+    },
+    {
+      task_id: 4,
+      status: "COMPLETED",
+      purchase_order_number: "ID1/POR/YESTERDAY",
+      pending_at: "2026-07-27T14:00:00.000Z",
+      completed_at: "2026-07-27T17:30:00.000Z",
+    },
+  ], [], { now: new Date("2026-07-28T18:00:00.000Z") });
+
+  assert.equal(dashboard.summary.total_tasks, 2);
+  assert.equal(dashboard.summary.pending, 1);
+  assert.equal(dashboard.summary.completed, 1);
+  assert.equal(dashboard.active_task_count, 1);
+  assert.equal(dashboard.tasks[0].done_gr_source, "PUTAWAY_PENDING");
+  assert.equal(dashboard.scope.excluded_po_prefix, "INV/SO/");
 });
 
 test("builds complete operational aggregates before applying the task row limit", () => {

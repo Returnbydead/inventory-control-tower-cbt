@@ -153,6 +153,18 @@ test("reserves detail capacity for active and completed backfill", () => {
   assert.deepEqual(selected.map((row) => row.id), [1, 2, 3, 4]);
 });
 
+test("can detail every active task while keeping completed backfill bounded", () => {
+  const rows = [
+    { id: 1, status: "PENDING" },
+    { id: 2, status: "IN_PROGRESS" },
+    { id: 3, status: "IN_PROGRESS" },
+    { id: 4, status: "COMPLETED" },
+    { id: 5, status: "COMPLETED" },
+  ];
+  const selected = selectDetailRows(rows, new Map(), 1, 4, new Date(), 15, 3);
+  assert.deepEqual(selected.map((row) => row.id), [1, 2, 3, 4]);
+});
+
 test("retries PO linkage for active tasks until DONE GR is available", () => {
   const tasks = [
     { status: "PENDING", purchase_order_number: "ID1/POR/1" },
