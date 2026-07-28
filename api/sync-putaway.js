@@ -455,6 +455,10 @@ async function executeSync(runId) {
       Number(process.env.WMS_ACTIVE_DETAIL_MAX_AGE_MINUTES || ACTIVE_DETAIL_MAX_AGE_MINUTES),
     );
     const fetchedList = await fetchPutawayTasks({ maxPages });
+    console.info("WMS putaway pagination trace", {
+      maxPages,
+      pages: fetchedList.pageTrace,
+    });
     const list = {
       rows: selectSnapshotRows(fetchedList.rows),
       // This is an operational subset, not a full historical snapshot.

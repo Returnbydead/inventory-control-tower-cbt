@@ -40,6 +40,10 @@ test("paginates CBT putaway list until a short page", async () => {
   assert.equal(result.complete, true);
   assert.equal(calls.length, 2);
   assert.match(calls[0], /location_ids=819/);
+  assert.deepEqual(result.pageTrace, [
+    { requestedPage: 1, rowCount: 2, pagination: {} },
+    { requestedPage: 2, rowCount: 1, pagination: {} },
+  ]);
 });
 
 test("paginates task items on the WIMS v2 endpoint", async () => {
