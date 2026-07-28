@@ -111,7 +111,7 @@ test("uses the Putaway PENDING activity as a transparent GR fallback", () => {
   assert.equal(dashboard.tasks[0].sla_state, "SAFE");
 });
 
-test("keeps active POR work, excludes INV/SO, and limits completed reporting to Jakarta today", () => {
+test("keeps every active task for SLA, excludes INV/SO only from completed and reconciliation, and limits completed reporting to Jakarta today", () => {
   const dashboard = buildDashboard([
     {
       task_id: 1,
@@ -141,12 +141,13 @@ test("keeps active POR work, excludes INV/SO, and limits completed reporting to 
     },
   ], [], { now: new Date("2026-07-28T18:00:00.000Z") });
 
-  assert.equal(dashboard.summary.total_tasks, 2);
+  assert.equal(dashboard.summary.total_tasks, 3);
   assert.equal(dashboard.summary.pending, 1);
+  assert.equal(dashboard.summary.in_progress, 1);
   assert.equal(dashboard.summary.completed, 1);
-  assert.equal(dashboard.active_task_count, 1);
-  assert.equal(dashboard.tasks[0].done_gr_source, "PUTAWAY_PENDING");
-  assert.equal(dashboard.scope.excluded_po_prefix, "INV/SO/");
+  assert.equal(dashboard.active_task_count, 2);
+  assert.equal(dashboard.tasks.find((task) => task.task_id === 1).done_gr_source, "PUTAWAY_PENDING");
+  assert.equal(dashboard.scope.reconciliation_excluded_po_prefix, "INV/SO/");
 });
 
 test("builds complete operational aggregates before applying the task row limit", () => {

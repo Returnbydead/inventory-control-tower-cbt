@@ -167,14 +167,16 @@ function buildDashboard(taskRows, itemRows, {
     };
   });
 
-  // Direct-sales tasks (INV/SO) are out of scope for the Putaway SLA ledger.
-  // Active POR work is kept regardless of age so an old breach remains visible;
-  // completed work is deliberately a Jakarta-today operational report.
+  // Every active task remains in the SLA ledger, including direct-sales work:
+  // its WMS PENDING activity is still operationally important. Direct-sales
+  // PO data is excluded only from inbound reconciliation below. Completed work
+  // is deliberately a Jakarta-today operational report.
   const operationalTasks = allTasks.filter((task) =>
-    !isSalesOrder(task.purchase_order_number)
-    && (
-      ACTIVE_STATUSES.has(task.status)
-      || (task.status === "COMPLETED" && jakartaDateKey(task.completed_at) === jakartaDateKey(now))
+    ACTIVE_STATUSES.has(task.status)
+    || (
+      task.status === "COMPLETED"
+      && !isSalesOrder(task.purchase_order_number)
+      && jakartaDateKey(task.completed_at) === jakartaDateKey(now)
     )
   );
 
@@ -312,7 +314,7 @@ function buildDashboard(taskRows, itemRows, {
   })).sort((left, right) => right.active_qty - left.active_qty);
 
   const reconciliationMap = new Map();
-  for (const task of filtered) {
+  for (const task of filtered.filter((task) => !isSalesOrder(task.purchase_order_number))) {
     const key = task.purchase_order_number || `TASK:${task.task_id}`;
     const row = reconciliationMap.get(key) || {
       purchase_order_number: task.purchase_order_number || "PO belum linked",
@@ -405,7 +407,7 @@ function buildDashboard(taskRows, itemRows, {
     scope: {
       active_statuses: ["PENDING", "IN_PROGRESS"],
       completed_window: "TODAY_ASIA_JAKARTA",
-      excluded_po_prefix: "INV/SO/",
+      reconciliation_excluded_po_prefix: "INV/SO/",
       done_gr_basis: "WMS_PENDING_ACTIVITY",
     },
     summary,
