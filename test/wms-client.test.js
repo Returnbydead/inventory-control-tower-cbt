@@ -38,6 +38,7 @@ test("paginates CBT putaway list until a short page", async () => {
   });
   assert.equal(result.rows.length, 3);
   assert.equal(result.complete, true);
+  assert.equal(calls.length, 2);
   assert.match(calls[0], /location_ids=819/);
 });
 
