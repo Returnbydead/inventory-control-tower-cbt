@@ -276,11 +276,8 @@ function selectDetailRows(
   return selected;
 }
 
-function selectSnapshotRows(listRows, recentLimit = 100) {
-  return listRows.filter((row, index) => {
-    const status = clean(row.status).toUpperCase();
-    return index < recentLimit || ACTIVE_STATUSES.has(status);
-  });
+function selectSnapshotRows(listRows) {
+  return [...listRows];
 }
 
 function selectPoNumbersForRefresh(tasks, stored = new Map(), limit = 75) {
@@ -439,12 +436,12 @@ async function executeSync(runId) {
       [runId],
     );
 
-    // Keep the operational snapshot inside the Vercel function window.
-    // Full historical backfill is handled separately from this live cron.
-    // Active Putaway can be older than the newest 100 rows. Read enough list
-    // pages to retain operational PENDING/IN_PROGRESS tasks, while the heavier
-    // detail and item calls remain bounded below.
-    const maxPages = Number(process.env.WMS_PUTAWAY_MAX_PAGES || 10);
+    // Read the full WMS list for CBT. The hard cap protects the scheduled
+    // function if the upstream service ever stops returning a short last page.
+    const configuredMaxPages = Number(process.env.WMS_PUTAWAY_MAX_PAGES || 200);
+    const maxPages = Number.isFinite(configuredMaxPages)
+      ? Math.min(200, Math.max(1, configuredMaxPages))
+      : 200;
     const detailLimit = Math.max(1, Number(process.env.WMS_DETAIL_BATCH_LIMIT || 10));
     const staleActiveDetailLimit = Math.min(
       detailLimit,
@@ -455,23 +452,17 @@ async function executeSync(runId) {
       Number(process.env.WMS_ACTIVE_DETAIL_MAX_AGE_MINUTES || ACTIVE_DETAIL_MAX_AGE_MINUTES),
     );
     const fetchedList = await fetchPutawayTasks({ maxPages });
-    console.info("WMS putaway pagination trace", {
-      maxPages,
-      pages: fetchedList.pageTrace,
-    });
     const list = {
       rows: selectSnapshotRows(fetchedList.rows),
-      // This is an operational subset, not a full historical snapshot.
-      complete: false,
+      complete: fetchedList.complete,
     };
     const listTaskIds = new Set(list.rows.map((row) => Number(row.id)));
     const staleCutoff = new Date(
       Date.now() - staleActiveMaxAgeMinutes * 60_000,
     ).toISOString();
-    // The WMS list is deliberately bounded for a fast live sync. Re-add a
-    // small oldest-first slice of stored active work so it cannot stay stale
-    // forever when it falls outside that list window.
-    const staleActive = await client.query(`
+    // Only carry forward stale active work when the upstream list reached its
+    // safety cap before a final short page.
+    const staleActive = list.complete ? { rows: [] } : await client.query(`
       SELECT
         task_id AS id, task_number, purchase_order_number, package_label,
         location_id, location_name, status, staff_name, inbound_date,

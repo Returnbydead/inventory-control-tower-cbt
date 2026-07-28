@@ -129,7 +129,7 @@ test("backfills a stored completed task that still has no detail", () => {
   assert.deepEqual(selected.map((row) => row.id), [1]);
 });
 
-test("keeps every active task beyond the recent snapshot window", () => {
+test("keeps every WMS task beyond the former recent snapshot window", () => {
   const rows = [
     { id: 1, status: "COMPLETED" },
     { id: 2, status: "COMPLETED" },
@@ -138,7 +138,7 @@ test("keeps every active task beyond the recent snapshot window", () => {
   ];
   assert.deepEqual(
     selectSnapshotRows(rows, 1).map((row) => row.id),
-    [1, 3, 4],
+    [1, 2, 3, 4],
   );
 });
 
