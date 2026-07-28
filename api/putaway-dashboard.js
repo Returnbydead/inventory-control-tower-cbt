@@ -356,6 +356,11 @@ function buildDashboard(taskRows, itemRows, {
     || (right.elapsed_minutes ?? -1) - (left.elapsed_minutes ?? -1)
     || right.task_id - left.task_id,
   );
+  const priorityQueue = [...activeTasks].sort((left, right) =>
+    left.priority_rank - right.priority_rank
+    || (right.elapsed_minutes ?? -1) - (left.elapsed_minutes ?? -1)
+    || right.task_id - left.task_id,
+  );
 
   const snapshotAt = allTasks.reduce(
     (latest, task) => task.synced_at && (!latest || task.synced_at > latest)
@@ -381,6 +386,8 @@ function buildDashboard(taskRows, itemRows, {
       zones: [...new Set(allTasks.flatMap((task) => task.zones).filter((value) => value !== "UNMAPPED"))].sort(),
     },
     total_filtered: filtered.length,
+    active_task_count: activeTasks.length,
+    priority_queue: priorityQueue,
     tasks: filtered.slice(0, limit),
   };
 }

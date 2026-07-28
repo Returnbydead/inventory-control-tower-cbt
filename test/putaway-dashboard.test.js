@@ -159,6 +159,8 @@ test("builds complete operational aggregates before applying the task row limit"
 
   assert.equal(dashboard.tasks.length, 1);
   assert.equal(dashboard.total_filtered, 3);
+  assert.equal(dashboard.active_task_count, 2);
+  assert.deepEqual(dashboard.priority_queue.map((task) => task.task_id), [2, 3]);
   assert.equal(dashboard.summary.total_tasks, 3);
   assert.equal(dashboard.summary.total_qty, 42);
   assert.equal(dashboard.status_breakdown.completed.qty, 10);

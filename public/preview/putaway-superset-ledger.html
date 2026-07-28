@@ -626,9 +626,12 @@
         { value: row => integer.format(numberValue(row.breached_tasks)) },
       ], "Tidak ada vendor untuk filter ini.");
 
-      const activeTasks = (payload.tasks || []).filter(task => cleanText(task.status).toUpperCase() !== "COMPLETED");
+      const activeTasks = Array.isArray(payload.priority_queue)
+        ? payload.priority_queue
+        : (payload.tasks || []).filter(task => cleanText(task.status).toUpperCase() !== "COMPLETED");
       const queueRows = activeTasks.map(task => ({ ...task, priority: task.sla_state === "BREACHED" || task.sla_state === "URGENT" }));
-      document.querySelector("#queueCount").textContent = `${integer.format(queueRows.length)} records`;
+      const activeTaskCount = numberValue(payload.active_task_count) || queueRows.length;
+      document.querySelector("#queueCount").textContent = `${integer.format(activeTaskCount)} records`;
       tableBody("#queueBody", queueRows, [
         { className: "left", value: row => row.package_label || "Asset ID belum linked" },
         { className: "left", value: row => row.task_number || "Task belum linked" },
