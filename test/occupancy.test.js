@@ -25,4 +25,18 @@ test("occupancy totals use every configured master location and never double cou
   assert.equal(result.total.utilization_pct, 41.67);
   assert.equal(result.zones[0].location_count, 2);
   assert.equal(result.l1.reduce((sum, row) => sum + row.space_qty, 0), 36);
+  assert.deepEqual(result.l1_by_storage, [{
+    target_l1: "Kebutuhan Cuci Baju",
+    shared: false,
+    mezzanine: {
+      space_qty: 36,
+      used_qty: 15,
+      wrong_qty: 4,
+      available_qty: 21,
+      utilization_pct: 41.67,
+      location_count: 2,
+    },
+    spr: null,
+    high_risk: null,
+  }]);
 });
