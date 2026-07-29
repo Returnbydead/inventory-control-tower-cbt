@@ -46,8 +46,17 @@ test("applies SRC aisle 18 Tata Rumah only to sequence 13-17", () => {
   );
 });
 
-test("keeps blank targets and non-halal outside accuracy", () => {
-  assert.equal(targetFor("CBT-SRC1-04-03-L1-01").status, "NO_TARGET");
+test("maps SRC1 aisles 04-06 to Kebutuhan Cuci Baju and keeps non-halal outside accuracy", () => {
+  for (const aisle of ["04", "05", "06"]) {
+    assert.equal(
+      evaluateCategory(`CBT-SRC1-${aisle}-03-L1-01`, "Kebutuhan Cuci Baju").result,
+      "COMPLIANT",
+    );
+  }
+  assert.equal(
+    evaluateCategory("CBT-SRC1-04-03-L1-01", "Kebutuhan Ibu & Bayi").result,
+    "WRONG_L1",
+  );
   const excluded = Object.entries(
     require("../public/data/l1-placement-rules.json").rules,
   ).find(([, rule]) => rule.excluded);
