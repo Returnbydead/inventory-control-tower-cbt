@@ -1,7 +1,7 @@
 const fs = require("node:fs/promises");
 const path = require("node:path");
 const { databaseName, getPool } = require("./sync-soh")._internal;
-const { evaluateCategory } = require("../lib/l1-placement");
+const { evaluateCategory, normalizeCategory } = require("../lib/l1-placement");
 const { summarizeOccupancy } = require("../lib/occupancy");
 
 const ALL_ZONES = "ALL";
@@ -28,10 +28,20 @@ function aggregateLiveRows(rows) {
   for (const row of rows) {
     const rackName = clean(row.rack_name);
     if (!rackName) continue;
-    const item = byRack.get(rackName) || { qty: 0, wrong_qty: 0 };
+    const item = byRack.get(rackName) || {
+      qty: 0,
+      wrong_qty: 0,
+      qty_by_l1: new Map(),
+      wrong_qty_by_l1: new Map(),
+    };
     const qty = number(row.stock);
+    const category = normalizeCategory(row.l1_category_name) || "Belum ada kategori L1";
     item.qty += qty;
-    if (evaluateCategory(rackName, row.l1_category_name).result === "WRONG_L1") item.wrong_qty += qty;
+    item.qty_by_l1.set(category, number(item.qty_by_l1.get(category)) + qty);
+    if (evaluateCategory(rackName, row.l1_category_name).result === "WRONG_L1") {
+      item.wrong_qty += qty;
+      item.wrong_qty_by_l1.set(category, number(item.wrong_qty_by_l1.get(category)) + qty);
+    }
     byRack.set(rackName, item);
   }
   return byRack;

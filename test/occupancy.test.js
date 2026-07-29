@@ -16,8 +16,13 @@ test("capacity key maps zone family and level", () => {
   assert.equal(capacityKey("SRA1", "L6"), "SRAL6");
 });
 
-test("occupancy totals use every configured master location and never double count L1 space", () => {
-  const live = new Map([["CBT-MZA1-01-01-L1-01", { qty: 15, wrong_qty: 4 }]]);
+test("occupancy totals use every configured master location and expose one L1 row per storage area", () => {
+  const live = new Map([["CBT-MZA1-01-01-L1-01", {
+    qty: 15,
+    wrong_qty: 4,
+    qty_by_l1: new Map([["Kebutuhan Cuci Baju", 15]]),
+    wrong_qty_by_l1: new Map([["Kebutuhan Cuci Baju", 4]]),
+  }]]);
   const result = summarizeOccupancy(master, live, { MZAL1: 12, MZAL2: 24 });
   assert.equal(result.total.space_qty, 36);
   assert.equal(result.total.used_qty, 15);
@@ -26,6 +31,20 @@ test("occupancy totals use every configured master location and never double cou
   assert.equal(result.zones[0].location_count, 2);
   assert.equal(result.l1.reduce((sum, row) => sum + row.space_qty, 0), 36);
   assert.deepEqual(result.l1_by_storage, [{
+    target_l1: "Kebutuhan Cuci Baju",
+    shared: false,
+    mezzanine: {
+      space_qty: 36,
+      used_qty: 15,
+      wrong_qty: 4,
+      available_qty: 21,
+      utilization_pct: 41.67,
+      location_count: 2,
+    },
+    spr: null,
+    high_risk: null,
+  }]);
+  assert.deepEqual(result.l1_category_by_storage, [{
     target_l1: "Kebutuhan Cuci Baju",
     shared: false,
     mezzanine: {
