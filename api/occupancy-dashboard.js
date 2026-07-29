@@ -3,6 +3,7 @@ const path = require("node:path");
 const { databaseName, getPool } = require("./sync-soh")._internal;
 const { evaluateCategory, normalizeCategory } = require("../lib/l1-placement");
 const { summarizeOccupancy } = require("../lib/occupancy");
+const { isExcludedOccupancyRack } = require("../lib/occupancy-exclusions");
 
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
@@ -27,7 +28,7 @@ function aggregateLiveRows(rows) {
   const byRack = new Map();
   for (const row of rows) {
     const rackName = clean(row.rack_name);
-    if (!rackName) continue;
+    if (!rackName || isExcludedOccupancyRack(rackName)) continue;
     const item = byRack.get(rackName) || {
       qty: 0,
       wrong_qty: 0,

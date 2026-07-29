@@ -64,3 +64,23 @@ test("occupancy totals use every configured master location and expose one L1 ro
     high_risk: null,
   }]);
 });
+
+test("occupancy excludes operational non-storage locations from every total", () => {
+  const scopedMaster = {
+    ...master,
+    locations: [
+      ...master.locations,
+      ["RACK - CONSUMABLE", 1, 1],
+      ["PARKIR-WTW-CBT", 1, 1],
+    ],
+  };
+  const live = new Map([
+    ["CBT-MZA1-01-01-L1-01", { qty: 15, wrong_qty: 0 }],
+    ["RACK - CONSUMABLE", { qty: 99, wrong_qty: 99 }],
+    ["PARKIR-WTW-CBT", { qty: 50, wrong_qty: 50 }],
+  ]);
+  const result = summarizeOccupancy(scopedMaster, live, { MZAL1: 12, MZAL2: 24 });
+  assert.equal(result.total.used_qty, 15);
+  assert.equal(result.total.location_count, 2);
+  assert.equal(result.unmastered_stock_qty, 0);
+});

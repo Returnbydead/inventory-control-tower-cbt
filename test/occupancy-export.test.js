@@ -1,6 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const { exportRow, selectedZones } = require("../api/occupancy-export")._test;
+const { isExcludedOccupancyRack } = require("../lib/occupancy-exclusions");
 
 test("occupancy export keeps SKU x SLOC detail and L1 compliance", () => {
   const row = exportRow({
@@ -25,4 +26,11 @@ test("occupancy export keeps SKU x SLOC detail and L1 compliance", () => {
 
 test("occupancy export accepts multiple zones", () => {
   assert.deepEqual(selectedZones("MZA1,SRC1"), ["MZA1", "SRC1"]);
+});
+
+test("occupancy export recognises every excluded non-storage location", () => {
+  assert.equal(isExcludedOccupancyRack("rack - consumable"), true);
+  assert.equal(isExcludedOccupancyRack("CBT-ADJ-01-01-01"), true);
+  assert.equal(isExcludedOccupancyRack("SUPPLIES-CBT-01"), true);
+  assert.equal(isExcludedOccupancyRack("PARKIR-WTW-CBT"), true);
 });

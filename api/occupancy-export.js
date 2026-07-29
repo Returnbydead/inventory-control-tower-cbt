@@ -1,6 +1,7 @@
 const { databaseName, getPool } = require("./sync-soh")._internal;
 const { evaluateCategory } = require("../lib/l1-placement");
 const { storageType } = require("../lib/occupancy");
+const { isExcludedOccupancyRack } = require("../lib/occupancy-exclusions");
 
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
@@ -85,7 +86,8 @@ module.exports = async function handler(req, res) {
         l1_category_name, l2_category_name
       ORDER BY zone, rack_name, sku_number
     `, [zones.includes(ALL_ZONES) ? ALL_ZONES : "", zones]);
-    const snapshot = result.rows.reduce((latest, row) => {
+    const rows = result.rows.filter((row) => !isExcludedOccupancyRack(row.rack_name));
+    const snapshot = rows.reduce((latest, row) => {
       const value = row.snapshot_at ? new Date(row.snapshot_at).toISOString() : "";
       return value > latest ? value : latest;
     }, "");
@@ -95,7 +97,7 @@ module.exports = async function handler(req, res) {
       "SKU", "Product Name", "L1 Aktual", "L2 Aktual", "Target L1", "Status L1", "Status Rule",
       "Qty", "Stock Value", "Source Rows",
     ]];
-    const csv = `\uFEFF${[...headers, ...result.rows.map((row) => exportRow(row, scope, snapshot))]
+    const csv = `\uFEFF${[...headers, ...rows.map((row) => exportRow(row, scope, snapshot))]
       .map((row) => row.map(csvValue).join(",")).join("\r\n")}`;
     const suffix = clean(req.query.table || "raw").replace(/[^a-z0-9_-]/gi, "-");
     const snapshotStamp = snapshot ? snapshot.replace(/[:.]/g, "-").slice(0, 19) : "snapshot";
