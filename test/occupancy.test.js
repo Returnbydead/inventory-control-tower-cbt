@@ -22,6 +22,7 @@ test("occupancy totals use every configured master location and expose one L1 ro
     wrong_qty: 4,
     qty_by_l1: new Map([["Kebutuhan Cuci Baju", 15]]),
     wrong_qty_by_l1: new Map([["Kebutuhan Cuci Baju", 4]]),
+    used_sloc_by_l1: new Set(["Kebutuhan Cuci Baju"]),
   }]]);
   const result = summarizeOccupancy(master, live, { MZAL1: 12, MZAL2: 24 });
   assert.equal(result.total.space_qty, 36);
@@ -40,6 +41,8 @@ test("occupancy totals use every configured master location and expose one L1 ro
       available_qty: 21,
       utilization_pct: 41.67,
       location_count: 2,
+      used_sloc_count: 1,
+      sloc_utilization_pct: 50,
     },
     spr: null,
     high_risk: null,
@@ -54,6 +57,8 @@ test("occupancy totals use every configured master location and expose one L1 ro
       available_qty: 21,
       utilization_pct: 41.67,
       location_count: 2,
+      used_sloc_count: 1,
+      sloc_utilization_pct: 50,
     },
     spr: null,
     high_risk: null,

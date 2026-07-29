@@ -33,11 +33,13 @@ function aggregateLiveRows(rows) {
       wrong_qty: 0,
       qty_by_l1: new Map(),
       wrong_qty_by_l1: new Map(),
+      used_sloc_by_l1: new Set(),
     };
     const qty = number(row.stock);
     const category = normalizeCategory(row.l1_category_name) || "Belum ada kategori L1";
     item.qty += qty;
     item.qty_by_l1.set(category, number(item.qty_by_l1.get(category)) + qty);
+    item.used_sloc_by_l1.add(category);
     if (evaluateCategory(rackName, row.l1_category_name).result === "WRONG_L1") {
       item.wrong_qty += qty;
       item.wrong_qty_by_l1.set(category, number(item.wrong_qty_by_l1.get(category)) + qty);
