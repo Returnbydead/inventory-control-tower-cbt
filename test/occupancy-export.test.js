@@ -38,4 +38,7 @@ test("occupancy export recognises every excluded non-storage location", () => {
   assert.equal(isExcludedOccupancyRack("CBT-STG1-LB-01-01-01"), true);
   assert.equal(isExcludedOccupancyRack("CBT-STG1-LB-01-01-02"), true);
   assert.equal(isExcludedOccupancyRack("CBT-STG1-RL-01-01-01"), true);
+  assert.equal(isExcludedOccupancyRack("CBT-QRT1-AD-01-01-01"), true);
+  assert.equal(isExcludedOccupancyRack("CBT-QRT1-OM-01-01-01"), true);
+  assert.equal(isExcludedOccupancyRack("CBT-QRT1-UO-01-01-01"), true);
 });
