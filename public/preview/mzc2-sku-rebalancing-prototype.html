@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <title>MZC2 SKU Rebalancing Prototype - Inventory Control Tower</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <!-- Prototype question: Can CBT supervisors monitor and review MZC2 SKU split across aisle Zones 1 and 2 using live SOH, without creating a WMS movement? -->
+  <link rel="stylesheet" href="/preview/mzc2-sku-rebalancing-tokens.css">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; margin: 0; overflow-x: clip; }
+    body { background: var(--paper-2); color: var(--ink); font: var(--text-base)/1.5 var(--font-body); }
+    button, input, select { min-height: var(--control-height); border: 1px solid var(--rule); border-radius: var(--radius); outline: 2px solid transparent; outline-offset: 1px; background: var(--surface); color: var(--ink); font: inherit; }
+    button { padding-inline: var(--space-md); cursor: pointer; white-space: nowrap; transition: background-color var(--dur-short) var(--ease-out), border-color var(--dur-short) var(--ease-out), color var(--dur-short) var(--ease-out); }
+    button:hover { border-color: var(--rule-strong); background: var(--paper); }
+    button:active { background: var(--paper-3); }
+    button:disabled { cursor: not-allowed; opacity: .55; }
+    button:focus-visible, input:focus-visible, select:focus-visible, .sku-button:focus-visible { outline-color: var(--focus); }
+    input, select { width: 100%; padding-inline: var(--space-sm); }
+    input::placeholder { color: var(--ink-2); }
+    .sidebar { position: fixed; inset: 0 auto 0 0; z-index: var(--z-sticky-nav); display: flex; flex-direction: column; width: var(--sidebar-width); padding: var(--space-lg) var(--space-md); gap: var(--space-lg); overflow-y: auto; background: var(--sidebar); color: var(--sidebar-ink); }
+    .brand { display: flex; align-items: center; gap: var(--space-sm); }.brand-mark { display: grid; place-items: center; width: 3.25rem; height: 3.25rem; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); font: 700 1rem var(--font-mono); }.brand strong, .brand span { display: block; }.brand span, .side-foot { color: var(--sidebar-muted); font-size: var(--text-sm); }
+    .side-nav { display: grid; gap: var(--space-xs); }.nav-label { margin: var(--space-md) 0 var(--space-2xs); color: var(--sidebar-muted); font: var(--text-xs) var(--font-mono); letter-spacing: .08em; }.side-link { display: flex; align-items: center; gap: var(--space-sm); min-height: var(--control-height); padding-inline: var(--space-sm); border-radius: var(--radius); color: var(--sidebar-muted); text-decoration: none; white-space: nowrap; }.side-link:hover { color: var(--sidebar-ink); background: var(--paper-3); }.side-icon { width: 1.5rem; text-align: center; font-family: var(--font-mono); }.side-foot { margin-top: auto; }.connection { display: inline-block; width: .625rem; height: .625rem; margin-right: var(--space-xs); border-radius: 50%; background: var(--safe); }
+    .workspace { min-width: 0; margin-left: var(--sidebar-width); }.topbar { position: sticky; top: 0; z-index: var(--z-sticky-nav); display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: var(--banner-height); padding: var(--space-sm) var(--space-xl); border-bottom: 1px solid var(--rule); background: var(--surface); }.crumb { min-width: 0; color: var(--ink-2); font-size: var(--text-sm); }.crumb strong { color: var(--ink); }.top-actions { display: flex; align-items: center; gap: var(--space-sm); }.freshness { color: var(--accent-strong); font-weight: 700; font-size: var(--text-sm); white-space: nowrap; }.freshness::before { content: ""; display: inline-block; width: .55rem; height: .55rem; margin-right: var(--space-xs); border-radius: 50%; background: currentColor; }
+    .dashboard { display: grid; gap: var(--space-md); padding: var(--space-md); }.section { min-width: 0; overflow: hidden; border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); }.section-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-md); min-height: 4.25rem; padding: var(--space-md) var(--space-lg); border-bottom: 1px solid var(--rule); }.section-heading h1, .section-heading h2 { min-width: 0; margin: 0; font-size: var(--text-md); line-height: 1.2; overflow-wrap: anywhere; }.section-heading p, .section-heading span { margin: 0; color: var(--ink-2); font-size: var(--text-sm); text-align: end; }.section-body { padding: var(--space-md) var(--space-lg) var(--space-lg); }
+    .context-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); }.zone-map { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); border: 1px solid var(--rule); border-radius: var(--radius); overflow: hidden; }.zone-map > div { min-width: 0; padding: var(--space-md); }.zone-map > div + div { border-left: 1px solid var(--rule); }.zone-map b { display: block; margin-bottom: var(--space-2xs); font: 700 var(--text-md)/1.1 var(--font-display); }.zone-map span { color: var(--ink-2); font-size: var(--text-sm); }.read-only { display: flex; align-items: center; padding: var(--space-md); border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper); color: var(--ink-2); font-size: var(--text-sm); }.read-only strong { margin-right: var(--space-xs); color: var(--ink); }
+    .filter-grid { display: grid; grid-template-columns: minmax(15rem, 2fr) minmax(12rem, 1fr) minmax(12rem, 1fr) auto; align-items: end; gap: var(--space-sm); }.field { display: grid; gap: var(--space-2xs); }.field label { color: var(--ink-2); font-size: var(--text-sm); }.helper { min-height: 1lh; margin: var(--space-xs) 0 0; color: var(--ink-2); font-size: var(--text-sm); }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }.kpi { min-width: 0; padding: var(--space-lg); border-right: 1px solid var(--rule); }.kpi:last-child { border-right: 0; }.kpi .label { display: flex; justify-content: space-between; gap: var(--space-xs); color: var(--ink-2); font-size: var(--text-sm); }.kpi strong { display: block; margin: var(--space-sm) 0 var(--space-2xs); font-size: clamp(1.9rem, 3vw, 2.5rem); line-height: 1; letter-spacing: -.055em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }.kpi.safe strong { color: var(--safe); }.kpi.warning strong { color: var(--warning); }.kpi.danger strong { color: var(--danger); }.kpi small { color: var(--ink-2); font-size: var(--text-xs); }
+    .workbench { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(19rem, .8fr); gap: var(--space-md); }.ledger-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-sm) var(--space-lg); border-bottom: 1px solid var(--rule); color: var(--ink-2); font-size: var(--text-sm); }.ledger-head strong { color: var(--ink); white-space: nowrap; }.table-shell { max-height: 34rem; overflow: auto; } table { width: 100%; min-width: 54rem; border-collapse: collapse; font-size: var(--text-sm); font-variant-numeric: tabular-nums; } th, td { padding: var(--space-xs) var(--space-sm); border-right: 1px solid var(--rule); border-bottom: 1px solid var(--rule); text-align: end; vertical-align: middle; } th:last-child, td:last-child { border-right: 0; } th { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--paper-2); white-space: nowrap; } th.left, td.left { text-align: start; }.sku-button { width: 100%; min-height: 0; padding: 0; border: 0; border-radius: 0; outline: 2px solid transparent; background: transparent; color: var(--accent-strong); text-align: start; text-decoration: underline; text-underline-offset: .125rem; cursor: pointer; white-space: normal; }.sku-button:hover { background: transparent; color: var(--accent); }.sku-button:active { background: transparent; color: var(--ink); }.qty-safe { color: var(--safe); font-weight: 700; }.qty-danger { color: var(--danger); font-weight: 700; }.muted { color: var(--ink-2); }.status { display: inline-block; padding: var(--space-3xs) var(--space-xs); border: 1px solid var(--rule); border-radius: var(--radius); color: var(--ink-2); font: 700 var(--text-xs)/1 var(--font-mono); white-space: nowrap; }.status.split { border-color: var(--warning); background: var(--warning-soft); color: var(--ink); }.empty { padding: var(--space-xl); color: var(--ink-2); text-align: center; }
+    .detail { display: grid; align-content: start; min-width: 0; }.detail-empty { display: grid; place-items: center; min-height: 18rem; padding: var(--space-xl); color: var(--ink-2); text-align: center; }.detail-content { display: grid; gap: var(--space-md); padding: var(--space-lg); }.detail-title { display: grid; gap: var(--space-2xs); }.detail-title strong { font-size: var(--text-md); overflow-wrap: anywhere; }.detail-title span { color: var(--ink-2); font-size: var(--text-sm); }.distribution { display: grid; gap: var(--space-xs); }.distribution-row { display: grid; grid-template-columns: 5rem minmax(0, 1fr) auto; align-items: center; gap: var(--space-sm); color: var(--ink-2); font-size: var(--text-sm); }.bar { height: .625rem; overflow: hidden; border-radius: var(--radius); background: var(--paper-3); }.bar i { display: block; height: 100%; background: var(--accent); }.distribution-row strong { color: var(--ink); font-variant-numeric: tabular-nums; }.review-note { padding: var(--space-md); border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper); color: var(--ink-2); font-size: var(--text-sm); }.review-note strong { display: block; margin-bottom: var(--space-2xs); color: var(--ink); }.rack-list { display: grid; gap: var(--space-xs); }.rack-list h3 { margin: 0; font-size: var(--text-sm); }.rack-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-sm); padding-top: var(--space-xs); border-top: 1px solid var(--rule); font-size: var(--text-sm); }.rack-row span { min-width: 0; overflow-wrap: anywhere; }.rack-row b { font-variant-numeric: tabular-nums; }
+    .notice { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); padding: var(--space-sm) var(--space-lg); border-top: 1px solid var(--rule); color: var(--ink-2); font-size: var(--text-sm); }.notice strong { color: var(--ink); }.foot-line { padding: var(--space-lg) var(--space-xl); border-top: 1px solid var(--rule); color: var(--ink-2); font-size: var(--text-sm); }.foot-line p { margin: 0; }
+    @media (max-width: 76rem) { .kpi-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }.kpi:nth-child(2) { border-right: 0; }.kpi:nth-child(n+3) { border-top: 1px solid var(--rule); }.workbench { grid-template-columns: 1fr; }.detail { border-top: 1px solid var(--rule); } }
+    @media (max-width: 64rem) { .sidebar { display: none; }.workspace { margin-left: 0; }.topbar { padding-inline: var(--space-md); }.filter-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }.filter-grid button { grid-column: span 2; } }
+    @media (max-width: 42rem) { .dashboard { padding: var(--space-xs); }.topbar { align-items: flex-start; }.top-actions { flex-direction: column; align-items: end; }.freshness { max-width: 12rem; overflow: hidden; text-overflow: ellipsis; }.section-heading { display: block; min-height: auto; }.section-heading p, .section-heading span { margin-top: var(--space-2xs); text-align: start; }.context-grid, .zone-map, .filter-grid, .kpi-grid { grid-template-columns: 1fr; }.zone-map > div + div { border-top: 1px solid var(--rule); border-left: 0; }.filter-grid button { grid-column: auto; }.kpi { border-right: 0; border-bottom: 1px solid var(--rule); }.kpi:last-child { border-bottom: 0; }.notice { align-items: flex-start; flex-direction: column; }.foot-line { padding-inline: var(--space-md); } }
+    @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto; transition-duration: 0ms; } }
+  </style>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark">IC</div><div><strong>Inventory Tower</strong><span>CBT - Operations</span></div></div>
+    <nav class="side-nav" aria-label="Navigasi utama">
+      <span class="nav-label">Control center</span>
+      <a class="side-link" href="/putaway"><span class="side-icon">P</span>Putaway Monitoring</a>
+      <a class="side-link" href="/sra1-spatial-prototype.html"><span class="side-icon">S</span>3D Rack View</a>
+      <span class="nav-label">Inventory</span>
+      <a class="side-link" href="/preview/planogram-l1-monitoring-prototype.html?zone=ALL"><span class="side-icon">A</span>Planogram Accuracy</a>
+      <a class="side-link" href="/occupancy"><span class="side-icon">O</span>Occupancy</a>
+      <a class="side-link" href="/sra1-spatial-prototype.html#lost-monitoring"><span class="side-icon">L</span>Lost Monitoring</a>
+    </nav>
+    <div class="side-foot"><i class="connection"></i>Preview environment</div>
+  </aside>
+  <main class="workspace">
+    <header class="topbar">
+      <div class="crumb">Inventory Control Tower / Occupancy / <strong>MZC2 Rebalancing Prototype</strong></div>
+      <div class="top-actions"><span id="freshness" class="freshness">Menyiapkan raw SOH...</span><button id="refresh" type="button">Refresh</button></div>
+    </header>
+    <div class="dashboard">
+      <section class="section">
+        <header class="section-heading"><h1>MZC2 SKU Rebalancing</h1><p>Visibility SKU yang tersebar antar zona aisle</p></header>
+        <div class="section-body context-grid">
+          <div class="zone-map" aria-label="Aturan pembagian area MZC2"><div><b>Zone 1</b><span>Aisle 01–18</span></div><div><b>Zone 2</b><span>Aisle 19–36</span></div></div>
+          <div class="read-only"><span><strong>Read-only prototype.</strong>SKU yang muncul di kedua zona ditandai untuk review konsolidasi. Tidak ada perpindahan barang dari halaman ini.</span></div>
+        </div>
+      </section>
+      <section class="section">
+        <header class="section-heading"><h2>Filter kandidat</h2><span>Data dari raw SOH MZC2</span></header>
+        <div class="section-body">
+          <div class="filter-grid">
+            <div class="field"><label for="search">Cari SKU, produk, atau L1</label><input id="search" type="search" placeholder="Contoh: 899, Kebutuhan Cuci Baju"></div>
+            <div class="field"><label for="view">Tampilkan</label><select id="view"><option value="split">SKU mencar saja</option><option value="all">Semua SKU</option></select></div>
+            <div class="field"><label for="sort">Urutkan</label><select id="sort"><option value="minor">Qty zona minor terbesar</option><option value="total">Total qty terbesar</option><option value="sku">SKU A–Z</option></select></div>
+            <button id="download" type="button" disabled>Download CSV</button>
+          </div>
+          <p id="helper" class="helper">Memuat raw SOH untuk aisle 01–36...</p>
+        </div>
+      </section>
+      <section class="section"><header class="section-heading"><h2>Ringkasan split</h2><span>Hasil berubah mengikuti filter</span></header><div id="kpis" class="kpi-grid"></div></section>
+      <section class="section">
+        <header class="section-heading"><h2>SKU review ledger</h2><span>Mulai dari qty yang paling banyak berada di zona minor</span></header>
+        <div class="workbench">
+          <div><div class="ledger-head"><span>SKU di dua zona = kandidat review, bukan instruksi pindah</span><strong id="count">0 SKU</strong></div><div class="table-shell"><table><thead><tr><th class="left">SKU / Produk</th><th class="left">L1</th><th>Zone 1<br><span class="muted">qty · SLOC</span></th><th>Zone 2<br><span class="muted">qty · SLOC</span></th><th>Zona minor</th><th>Status</th></tr></thead><tbody id="ledger"></tbody></table></div></div>
+          <aside class="detail" aria-live="polite"><div id="detail" class="detail-empty">Pilih SKU dari ledger untuk melihat sebaran rack dan arah review.</div></aside>
+        </div>
+        <div class="notice"><span><strong>Aturan prototype:</strong> Zone 1 = aisle 01–18; Zone 2 = aisle 19–36. Aisle kosong atau di luar range tidak dimasukkan.</span><span id="snapshot">Snapshot: —</span></div>
+      </section>
+    </div>
+    <footer class="foot-line"><p>MZC2 rebalancing prototype · Untuk visibility dan review penempatan, tidak menjalankan proses movement WMS.</p></footer>
+  </main>
+  <script>
+    const $ = (selector) => document.querySelector(selector);
+    const numberFormat = new Intl.NumberFormat('id-ID', { maximumFractionDigits: 0 });
+    const percentFormat = new Intl.NumberFormat('id-ID', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+    const escapeHtml = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' })[char]);
+    const qty = (value) => numberFormat.format(Number(value || 0));
+    const normalize = (value) => String(value ?? '').trim().toLocaleLowerCase('id-ID');
+    const asNumber = (value) => Number(String(value ?? '').replace(/[^0-9.-]/g, '')) || 0;
+    let sourceRows = [];
+    let groups = [];
+    let selectedSku = '';
+    let snapshotAt = '';
+
+    function parseCsv(text) {
+      const rows = []; let row = []; let cell = ''; let quoted = false;
+      for (let index = 0; index < text.length; index += 1) {
+        const char = text[index]; const next = text[index + 1];
+        if (char === '"' && quoted && next === '"') { cell += '"'; index += 1; }
+        else if (char === '"') { quoted = !quoted; }
+        else if (char === ',' && !quoted) { row.push(cell); cell = ''; }
+        else if ((char === '\n' || char === '\r') && !quoted) { if (char === '\r' && next === '\n') index += 1; row.push(cell); if (row.some((value) => value !== '')) rows.push(row); row = []; cell = ''; }
+        else { cell += char; }
+      }
+      if (cell || row.length) { row.push(cell); rows.push(row); }
+      const [headers = [], ...records] = rows;
+      return records.map((values) => Object.fromEntries(headers.map((header, index) => [header.replace(/^\uFEFF/, ''), values[index] ?? ''])));
+    }
+
+    function zoneForAisle(value) { const aisle = asNumber(value); if (aisle >= 1 && aisle <= 18) return 'zone1'; if (aisle >= 19 && aisle <= 36) return 'zone2'; return ''; }
+    function groupRows(rows) {
+      const map = new Map();
+      rows.forEach((row) => {
+        const placementZone = zoneForAisle(row.Aisle);
+        const sku = String(row.SKU || '').trim();
+        if (!placementZone || !sku) return;
+        const key = sku;
+        if (!map.has(key)) map.set(key, { sku, product: row['Product Name'] || 'Produk tanpa nama', l1: row['L1 Aktual'] || 'L1 belum terisi', zone1Qty: 0, zone2Qty: 0, zone1Racks: new Map(), zone2Racks: new Map(), raw: [] });
+        const group = map.get(key); const rowQty = asNumber(row.Qty); const rack = row['SLOC / Rack'] || 'Rack belum terbaca';
+        group[placementZone === 'zone1' ? 'zone1Qty' : 'zone2Qty'] += rowQty;
+        const rackMap = group[placementZone === 'zone1' ? 'zone1Racks' : 'zone2Racks'];
+        rackMap.set(rack, (rackMap.get(rack) || 0) + rowQty);
+        group.raw.push({ ...row, placementZone, parsedQty: rowQty });
+      });
+      return [...map.values()].map((group) => ({ ...group, totalQty: group.zone1Qty + group.zone2Qty, isSplit: group.zone1Qty > 0 && group.zone2Qty > 0, minorQty: Math.min(group.zone1Qty, group.zone2Qty), dominantZone: group.zone1Qty === group.zone2Qty ? 'Seimbang' : group.zone1Qty > group.zone2Qty ? 'Zone 1' : 'Zone 2', zone1Sloc: group.zone1Racks.size, zone2Sloc: group.zone2Racks.size }));
+    }
+    function visibleGroups() {
+      const query = normalize($('#search').value);
+      const view = $('#view').value;
+      const sort = $('#sort').value;
+      const visible = groups.filter((group) => (view === 'all' || group.isSplit) && (!query || normalize(`${group.sku} ${group.product} ${group.l1}`).includes(query)));
+      return visible.sort((a, b) => sort === 'sku' ? a.sku.localeCompare(b.sku) : sort === 'total' ? b.totalQty - a.totalQty : b.minorQty - a.minorQty);
+    }
+    function renderKpis(rows) {
+      const splitRows = rows.filter((group) => group.isSplit);
+      const minorQty = splitRows.reduce((sum, group) => sum + group.minorQty, 0);
+      const totalQty = rows.reduce((sum, group) => sum + group.totalQty, 0);
+      const zone1Qty = rows.reduce((sum, group) => sum + group.zone1Qty, 0);
+      const zone2Qty = rows.reduce((sum, group) => sum + group.zone2Qty, 0);
+      const cards = [
+        ['SKU terlihat', rows.length, 'SKU dengan aisle valid MZC2', ''],
+        ['SKU mencar', splitRows.length, 'Muncul di Zone 1 dan Zone 2', splitRows.length ? 'warning' : 'safe'],
+        ['Qty perlu review', minorQty, 'Total qty di zona minor', splitRows.length ? 'danger' : 'safe'],
+        ['Sebaran qty', `${percentFormat.format(totalQty ? (zone1Qty / totalQty) * 100 : 0)}% / ${percentFormat.format(totalQty ? (zone2Qty / totalQty) * 100 : 0)}%`, 'Zone 1 / Zone 2', '']
+      ];
+      $('#kpis').innerHTML = cards.map(([label, value, note, tone]) => `<article class="kpi ${tone}"><div class="label"><span>${label}</span></div><strong>${typeof value === 'number' ? qty(value) : escapeHtml(value)}</strong><small>${escapeHtml(note)}</small></article>`).join('');
+    }
+    function renderLedger() {
+      const rows = visibleGroups();
+      renderKpis(rows);
+      $('#count').textContent = `${qty(rows.length)} SKU`;
+      $('#helper').textContent = `${qty(rows.length)} SKU tampil · ${qty(rows.filter((group) => group.isSplit).length)} SKU muncul di kedua zona.`;
+      $('#ledger').innerHTML = rows.length ? rows.map((group) => `<tr><td class="left"><button class="sku-button" type="button" data-sku="${escapeHtml(group.sku)}">${escapeHtml(group.sku)}<br><span class="muted">${escapeHtml(group.product)}</span></button></td><td class="left">${escapeHtml(group.l1)}</td><td>${qty(group.zone1Qty)}<br><span class="muted">${qty(group.zone1Sloc)} SLOC</span></td><td>${qty(group.zone2Qty)}<br><span class="muted">${qty(group.zone2Sloc)} SLOC</span></td><td class="${group.isSplit ? 'qty-danger' : 'qty-safe'}">${group.isSplit ? qty(group.minorQty) : '—'}</td><td><span class="status ${group.isSplit ? 'split' : ''}">${group.isSplit ? 'PERLU REVIEW' : 'SATU ZONA'}</span></td></tr>`).join('') : '<tr><td class="empty" colspan="6">Tidak ada SKU pada filter ini.</td></tr>';
+      if (selectedSku && !rows.some((group) => group.sku === selectedSku)) { selectedSku = ''; $('#detail').className = 'detail-empty'; $('#detail').textContent = 'Pilih SKU dari ledger untuk melihat sebaran rack dan arah review.'; }
+    }
+    function rackRows(racks) { return [...racks.entries()].sort((a, b) => b[1] - a[1]).map(([rack, value]) => `<div class="rack-row"><span>${escapeHtml(rack)}</span><b>${qty(value)}</b></div>`).join('') || '<div class="rack-row"><span>Tidak ada qty</span><b>0</b></div>'; }
+    function renderDetail(group) {
+      if (!group) return;
+      selectedSku = group.sku;
+      const target = group.isSplit && group.dominantZone !== 'Seimbang' ? `${group.dominantZone} sebagai kandidat konsolidasi` : group.isSplit ? 'Review manual karena qty kedua zona seimbang' : 'Tidak perlu konsolidasi antar zona';
+      const width1 = group.totalQty ? (group.zone1Qty / group.totalQty) * 100 : 0;
+      const width2 = group.totalQty ? (group.zone2Qty / group.totalQty) * 100 : 0;
+      $('#detail').className = 'detail-content';
+      $('#detail').innerHTML = `<div class="detail-title"><strong>${escapeHtml(group.sku)}</strong><span>${escapeHtml(group.product)}</span><span>${escapeHtml(group.l1)}</span></div><div class="distribution"><div class="distribution-row"><span>Zone 1</span><div class="bar"><i style="width:${width1}%"></i></div><strong>${qty(group.zone1Qty)}</strong></div><div class="distribution-row"><span>Zone 2</span><div class="bar"><i style="width:${width2}%"></i></div><strong>${qty(group.zone2Qty)}</strong></div></div><div class="review-note"><strong>Arah review</strong>${escapeHtml(target)}. Validasi dahulu kapasitas, kondisi picking, dan aturan L1 sebelum membuat task movement.</div><div class="rack-list"><h3>Zone 1 · aisle 01–18</h3>${rackRows(group.zone1Racks)}</div><div class="rack-list"><h3>Zone 2 · aisle 19–36</h3>${rackRows(group.zone2Racks)}</div>`;
+    }
+    function exportVisible() {
+      const output = [['SKU', 'Product Name', 'L1 Aktual', 'Area MZC2', 'Aisle', 'SLOC / Rack', 'Qty', 'Status L1', 'Target L1', 'Status Review']];
+      visibleGroups().forEach((group) => group.raw.forEach((row) => output.push([group.sku, group.product, group.l1, row.placementZone === 'zone1' ? 'Zone 1 (Aisle 01-18)' : 'Zone 2 (Aisle 19-36)', row.Aisle, row['SLOC / Rack'], row.parsedQty, row['Status L1'], row['Target L1'], group.isSplit ? 'PERLU REVIEW' : 'SATU ZONA'])));
+      const csv = `\uFEFF${output.map((line) => line.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')}`;
+      const link = document.createElement('a'); link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); link.download = `mzc2-sku-rebalancing-${new Date().toISOString().slice(0, 10)}.csv`; document.body.append(link); link.click(); link.remove(); URL.revokeObjectURL(link.href);
+    }
+    async function load() {
+      $('#freshness').textContent = 'Mengambil raw SOH...'; $('#download').disabled = true; $('#helper').textContent = 'Memuat raw SOH MZC2 dan membagi aisle 01–36...';
+      try {
+        if (location.protocol === 'file:') throw new Error('Buka preview melalui local server atau deployment agar raw SOH dapat dibaca.');
+        const response = await fetch('/api/occupancy-export?zone=MZC2&table=mzc2-rebalancing', { cache: 'no-store' });
+        if (!response.ok) throw new Error(`Raw SOH tidak tersedia (${response.status})`);
+        sourceRows = parseCsv(await response.text()); groups = groupRows(sourceRows);
+        snapshotAt = sourceRows.find((row) => row.Snapshot)?.Snapshot || ''; const label = snapshotAt ? new Date(snapshotAt).toLocaleString('id-ID', { dateStyle: 'short', timeStyle: 'medium' }) : 'snapshot tidak tersedia';
+        $('#freshness').textContent = `Live · ${label}`; $('#snapshot').textContent = `Snapshot: ${label}`; $('#download').disabled = false; renderLedger();
+      } catch (error) {
+        groups = []; renderKpis([]); $('#count').textContent = '0 SKU'; $('#ledger').innerHTML = `<tr><td class="empty" colspan="6">Raw SOH MZC2 belum dapat dimuat: ${escapeHtml(error.message)}</td></tr>`; $('#helper').textContent = 'Preview tidak memakai data contoh.'; $('#freshness').textContent = 'Snapshot gagal dimuat'; $('#snapshot').textContent = 'Snapshot: tidak tersedia';
+      }
+    }
+    $('#search').addEventListener('input', renderLedger); $('#view').addEventListener('change', renderLedger); $('#sort').addEventListener('change', renderLedger); $('#refresh').addEventListener('click', load); $('#download').addEventListener('click', exportVisible);
+    $('#ledger').addEventListener('click', (event) => { const button = event.target.closest('[data-sku]'); if (!button) return; renderDetail(groups.find((group) => group.sku === button.dataset.sku)); });
+    load();
+  </script>
+</body>
+</html>
