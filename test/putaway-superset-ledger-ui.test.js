@@ -66,11 +66,12 @@ test("uses explicit quantity-reconciliation labels instead of ambiguous variance
   assert.doesNotMatch(html, />Variance</);
 });
 
-test("keeps SLA and reconciliation readable at full width", () => {
+test("keeps retired summary sections hidden so the SLA queue has more TV space", () => {
   assert.match(html, /class="vertical-stack"/);
   assert.match(html, /id="slaBar"/);
   assert.match(html, /id="completedTaskCount"/);
   assert.match(html, /SLA tercapai/);
+  assert.match(html, /class="section sla-section" hidden aria-hidden="true"/);
   assert.doesNotMatch(html, /id="slaDonut"/);
   assert.match(html, /class="section reconciliation-section" hidden/);
   assert.doesNotMatch(html, /id="exceptionGrid"/);
