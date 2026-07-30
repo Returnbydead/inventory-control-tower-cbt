@@ -165,18 +165,19 @@ test("can detail every active task while keeping completed backfill bounded", ()
   assert.deepEqual(selected.map((row) => row.id), [1, 2, 3, 4]);
 });
 
-test("retries PO linkage for active tasks until DONE GR is available", () => {
+test("retries PO linkage for active tasks until DONE GR and vendor are available", () => {
   const tasks = [
     { status: "PENDING", purchase_order_number: "ID1/POR/1" },
     { status: "IN_PROGRESS", purchase_order_number: "ID1/POR/2" },
     { status: "COMPLETED", purchase_order_number: "ID1/POR/3" },
   ];
   const stored = new Map([
-    ["ID1/POR/1", { received_at: null }],
-    ["ID1/POR/2", { received_at: "2026-07-26T02:00:00.000Z" }],
+    ["ID1/POR/1", { received_at: null, vendor_name: "Vendor A" }],
+    ["ID1/POR/2", { received_at: "2026-07-26T02:00:00.000Z", vendor_name: "" }],
   ]);
   assert.deepEqual(selectPoNumbersForRefresh(tasks, stored), [
     "ID1/POR/1",
+    "ID1/POR/2",
     "ID1/POR/3",
   ]);
 });

@@ -297,7 +297,10 @@ function selectPoNumbersForRefresh(tasks, stored = new Map(), limit = 75) {
       || !/^ID1\/PO[RX]\//i.test(poNumber)
     ) continue;
     const current = stored.get(poNumber);
-    if (!current || !current.received_at) {
+    // A task can already have its GR/PENDING timestamp from the Putaway API
+    // while its Commercial PO record has not been resolved yet. Keep those
+    // active PORs in the retry queue until the vendor is available as well.
+    if (!current || !current.received_at || !clean(current.vendor_name)) {
       candidates.push(poNumber);
       seen.add(poNumber);
     }
@@ -550,14 +553,17 @@ async function executeSync(runId) {
       .filter((number) => /^ID1\/POR\//i.test(number)))];
     const storedPoResult = candidatePoNumbers.length
       ? await client.query(`
-        SELECT purchase_order_number, received_at
+        SELECT purchase_order_number, received_at, vendor_name
         FROM inbound_po_current
         WHERE purchase_order_number = ANY($1::VARCHAR[])
       `, [candidatePoNumbers])
       : { rows: [] };
     const storedPos = new Map(storedPoResult.rows.map((row) => [
       clean(row.purchase_order_number),
-      { received_at: row.received_at || null },
+      {
+        received_at: row.received_at || null,
+        vendor_name: clean(row.vendor_name) || null,
+      },
     ]));
     const poNumbers = selectPoNumbersForRefresh(
       tasks,
@@ -566,7 +572,7 @@ async function executeSync(runId) {
     );
     const poList = await fetchPurchaseOrders({
       targetNumbers: poNumbers,
-      maxPages: Number(process.env.WMS_PO_MAX_PAGES || 30),
+      maxPages: Number(process.env.WMS_PO_MAX_PAGES || 60),
     });
     const poDetails = await mapConcurrent(
       poList.rows,
