@@ -1,0 +1,84 @@
+/* Revision 2: keep the prototype aligned with the Operational Ledger screens. */
+.dashboard > .section:first-child { display: none; }
+.workbench { display: block; }
+.workbench > .detail { display: none; }
+.workbench > div { min-width: 0; }
+.table-shell { max-height: 38rem; }
+
+.sku-dialog {
+  width: min(94vw, 88rem);
+  max-width: none;
+  max-height: 90vh;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-float);
+}
+.sku-dialog::backdrop { background: rgb(5 21 34 / .48); }
+.dialog-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--rule);
+}
+.dialog-kicker {
+  margin: 0 0 var(--space-3xs);
+  color: var(--ink-2);
+  font: var(--text-xs) var(--font-mono);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.dialog-top h2 { margin: 0; font-size: var(--text-lg); overflow-wrap: anywhere; }
+.dialog-body { max-height: calc(90vh - 5.5rem); overflow: auto; }
+.detail-content { display: grid; gap: var(--space-md); padding: var(--space-lg); }
+.detail-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--rule);
+  border-radius: var(--radius);
+}
+.detail-stat { padding: var(--space-md); border-right: 1px solid var(--rule); }
+.detail-stat:last-child { border-right: 0; }
+.detail-stat span { display: block; color: var(--ink-2); font-size: var(--text-xs); }
+.detail-stat strong { display: block; margin-top: var(--space-2xs); font-size: var(--text-md); font-variant-numeric: tabular-nums; }
+.detail-grid { display: grid; grid-template-columns: minmax(18rem, .85fr) minmax(0, 1.4fr); gap: var(--space-md); }
+.review-note, .distribution { padding: var(--space-md); border: 1px solid var(--rule); border-radius: var(--radius); background: var(--paper); }
+.review-note { color: var(--ink-2); font-size: var(--text-sm); }
+.review-note strong { display: block; margin-bottom: var(--space-2xs); color: var(--ink); }
+.distribution { display: grid; gap: var(--space-sm); }
+.distribution h3, .raw-heading h3 { margin: 0; font-size: var(--text-sm); }
+.distribution-row { display: grid; grid-template-columns: 5rem minmax(0, 1fr) auto; align-items: center; gap: var(--space-sm); color: var(--ink-2); font-size: var(--text-sm); }
+.bar { height: .625rem; overflow: hidden; border-radius: var(--radius); background: var(--paper-3); }
+.bar i { display: block; height: 100%; background: var(--accent); }
+.distribution-row strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.rack-list { display: grid; gap: var(--space-xs); }
+.rack-list h3 { margin: 0; font-size: var(--text-sm); }
+.rack-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--space-sm); padding-top: var(--space-xs); border-top: 1px solid var(--rule); font-size: var(--text-sm); }
+.rack-row span { min-width: 0; overflow-wrap: anywhere; }
+.rack-row b { font-variant-numeric: tabular-nums; }
+.raw-panel { overflow: hidden; border: 1px solid var(--rule); border-radius: var(--radius); }
+.raw-heading { display: flex; justify-content: space-between; gap: var(--space-sm); padding: var(--space-sm) var(--space-md); border-bottom: 1px solid var(--rule); }
+.raw-heading span { color: var(--ink-2); font-size: var(--text-xs); }
+.raw-table-shell { max-height: 22rem; overflow: auto; }
+.raw-panel table { min-width: 54rem; }
+.raw-panel th, .raw-panel td { font-size: var(--text-xs); }
+
+@media (max-width: 76rem) {
+  .detail-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .detail-stat:nth-child(2) { border-right: 0; }
+  .detail-stat:nth-child(n + 3) { border-top: 1px solid var(--rule); }
+  .detail-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 42rem) {
+  .dialog-top { padding-inline: var(--space-md); }
+  .detail-content { padding: var(--space-md); }
+  .detail-summary { grid-template-columns: 1fr; }
+  .detail-stat { border-right: 0; border-bottom: 1px solid var(--rule); }
+  .detail-stat:last-child { border-bottom: 0; }
+}
