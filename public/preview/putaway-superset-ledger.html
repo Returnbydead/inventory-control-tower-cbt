@@ -392,14 +392,6 @@
           </section>
         </div>
 
-        <section class="section exception-section">
-          <header class="section-heading">
-            <h2>Exception Board</h2>
-            <span>Missing link dan pekerjaan yang perlu ditindaklanjuti</span>
-          </header>
-          <div class="section-body"><div id="exceptionGrid" class="exception-grid"></div></div>
-        </section>
-
         <div class="split-row queue-vendor-stack">
           <section class="section vendor-section">
             <header class="section-heading">
@@ -599,22 +591,6 @@
         { value: row => integer.format(numberValue(row.task_count)) },
         { value: row => integer.format(numberValue(row.asset_count)) },
       ], "Tidak ada data rekonsiliasi untuk filter ini.");
-
-      const exceptionSummary = payload.exceptions?.summary || {};
-      const exceptionLabels = [
-        ["grn_without_task", "GR done tanpa task"],
-        ["task_without_gr", "Task tanpa GR link"],
-        ["missing_po", "PO belum linked"],
-        ["missing_asset", "Asset ID belum linked"],
-        ["missing_vendor", "Vendor belum linked"],
-        ["unassigned_manpower", "Active task belum assign"],
-      ];
-      const actionableExceptions = exceptionLabels.filter(([key]) => numberValue(exceptionSummary[key]) > 0);
-      document.querySelector("#exceptionGrid").innerHTML = actionableExceptions.length
-        ? actionableExceptions.map(([key, label]) =>
-          `<div class="exception-card"><strong>${integer.format(numberValue(exceptionSummary[key]))}</strong><span>${escapeHtml(label)}</span></div>`
-        ).join("")
-        : '<p class="exception-clear">Tidak ada exception aktif untuk filter ini.</p>';
 
       tableBody("#vendorBody", payload.vendor_breakdown || [], [
         { className: "left", value: row => row.vendor_name },

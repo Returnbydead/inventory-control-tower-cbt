@@ -46,18 +46,18 @@ test("stacks the operational reporting tables at full reading width", () => {
   assert.match(html, /\.queue-vendor-stack \.queue-section \{\s*order: -1;/);
 });
 
-test("covers the seven operational reporting areas", () => {
+test("covers the operational reporting areas without the retired exception board", () => {
   for (const label of [
     "Task, Quantity, SKU, PO &amp; Asset",
     "Output &amp; SLA",
     "Selisih Qty Inbound vs Task",
-    "Exception Board",
     "Manpower Workload",
     "Destination Rack &amp; Zone",
     "Filter Operasional",
   ]) {
     assert.ok(html.includes(label), `${label} is missing`);
   }
+  assert.doesNotMatch(html, /Exception Board/);
 });
 
 test("uses explicit quantity-reconciliation labels instead of ambiguous variance wording", () => {
@@ -66,15 +66,14 @@ test("uses explicit quantity-reconciliation labels instead of ambiguous variance
   assert.doesNotMatch(html, />Variance</);
 });
 
-test("keeps SLA, reconciliation, and exceptions readable at full width", () => {
+test("keeps SLA and reconciliation readable at full width", () => {
   assert.match(html, /class="vertical-stack"/);
   assert.match(html, /id="slaBar"/);
   assert.match(html, /id="completedTaskCount"/);
   assert.match(html, /SLA tercapai/);
   assert.doesNotMatch(html, /id="slaDonut"/);
   assert.match(html, /class="section reconciliation-section" hidden/);
-  assert.match(html, /const actionableExceptions = exceptionLabels\.filter/);
-  assert.match(html, /Tidak ada exception aktif untuk filter ini\./);
+  assert.doesNotMatch(html, /id="exceptionGrid"/);
 });
 
 test("maps server-side aggregates into the live dashboard", () => {
@@ -85,7 +84,7 @@ test("maps server-side aggregates into the live dashboard", () => {
   assert.match(html, /payload\.manpower_breakdown/);
   assert.match(html, /payload\.rack_breakdown/);
   assert.match(html, /payload\.reconciliation/);
-  assert.match(html, /payload\.exceptions/);
+  assert.doesNotMatch(html, /payload\.exceptions/);
 });
 
 test("uses server-backed filters and keeps the raw remaining-minute source", () => {
