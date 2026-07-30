@@ -16,8 +16,8 @@ const dashboardPages = [
 test("every operational dashboard keeps the full navigation list", () => {
   for (const [name, html] of dashboardPages) {
     for (const label of [
-      "Putaway",
-      "Spatial Visibility",
+      "Putaway Monitoring",
+      "3D Rack View",
       "Planogram Accuracy",
       "Occupancy",
       "Lost Monitoring",
