@@ -415,7 +415,7 @@
             <div class="toolbar"><span>Active tasks dari filter saat ini</span><strong id="queueCount">0 records</strong></div>
             <div class="table-shell tall">
               <table>
-                <thead><tr><th class="left">Asset ID</th><th class="left">Putaway Task Number</th><th class="left">Vendor</th><th>Sisa SLA</th><th>Used Lead Time</th><th>Status</th><th>GR</th><th>SKU</th><th>Quantity</th></tr></thead>
+                <thead><tr><th class="left">Asset ID</th><th class="left">Putaway Task Number</th><th class="left">Vendor</th><th>Used Lead Time</th><th>Minus SLA</th><th>Status</th><th>GR</th><th>SKU</th><th>Quantity</th></tr></thead>
                 <tbody id="queueBody"></tbody>
               </table>
             </div>
@@ -481,6 +481,13 @@
     const formatHours = minutes => Number.isFinite(Number(minutes))
       ? `${decimal.format(Number(minutes) / 60)} jam`
       : "—";
+    const formatDuration = minutes => {
+      if (!Number.isFinite(Number(minutes))) return "-";
+      const totalMinutes = Math.round(Math.abs(Number(minutes)));
+      const hours = Math.floor(totalMinutes / 60);
+      const remainder = totalMinutes % 60;
+      return `${integer.format(hours)} jam ${integer.format(remainder)} min`;
+    };
     const formatTime = value => value
       ? new Date(value).toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit" })
       : "—";
@@ -612,8 +619,8 @@
         { className: "left", value: row => row.package_label || "Asset ID belum linked" },
         { className: "left", value: row => row.task_number || "Task belum linked" },
         { className: "left", value: row => row.vendor_name || "Vendor belum linked" },
-        { className: row => numberValue(row.remaining_minutes) < 0 ? "sla-negative" : "sla-positive", value: row => formatHours(row.remaining_minutes) },
-        { value: row => `${integer.format(numberValue(row.elapsed_minutes))} min` },
+        { value: row => formatDuration(row.elapsed_minutes) },
+        { className: row => numberValue(row.remaining_minutes) < 0 ? "sla-negative" : "", value: row => numberValue(row.remaining_minutes) < 0 ? formatDuration(row.remaining_minutes) : "-" },
         { value: row => labelStatus(row.status) },
         { value: row => row.received_at ? "Done GR" : "GR not linked" },
         { value: row => integer.format(numberValue(row.sku_count)) },

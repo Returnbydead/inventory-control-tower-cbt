@@ -87,13 +87,15 @@ test("maps server-side aggregates into the live dashboard", () => {
   assert.doesNotMatch(html, /payload\.exceptions/);
 });
 
-test("uses server-backed filters and keeps the raw remaining-minute source", () => {
+test("uses server-backed filters and separates used time from SLA deficit", () => {
   for (const id of ["filterStatus", "filterSla", "filterVendor", "filterStaff", "filterZone", "filterSearch"]) {
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /const params = new URLSearchParams\(\)/);
   assert.match(html, /fetch\(`\/api\/putaway-dashboard\?\$\{params\}`/);
-  assert.match(html, /formatHours\(row\.remaining_minutes\)/);
+  assert.match(html, /<th>Used Lead Time<\/th><th>Minus SLA<\/th>/);
+  assert.match(html, /formatDuration\(row\.elapsed_minutes\)/);
+  assert.match(html, /formatDuration\(row\.remaining_minutes\)/);
   assert.match(html, /remaining_minutes/);
 });
 
