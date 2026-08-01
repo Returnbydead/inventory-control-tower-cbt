@@ -41,8 +41,8 @@ test("preserves the Superset Putaway reporting sections", () => {
 
 test("stacks the operational reporting tables at full reading width", () => {
   assert.match(html, /class="split-row queue-vendor-stack"/);
-  assert.match(html, /class="split-row manpower-rack-stack"/);
-  assert.match(html, /\.queue-vendor-stack,\s*\.manpower-rack-stack\s*\{\s*grid-template-columns: minmax\(0, 1fr\);/);
+  assert.match(html, /class="split-row manpower-stack"/);
+  assert.match(html, /\.queue-vendor-stack,\s*\.manpower-stack\s*\{\s*grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(html, /\.queue-vendor-stack \.queue-section \{\s*order: -1;/);
 });
 
@@ -52,12 +52,12 @@ test("covers the operational reporting areas without the retired exception board
     "Output &amp; SLA",
     "Selisih Qty Inbound vs Task",
     "Manpower Workload",
-    "Destination Rack &amp; Zone",
     "Filter Operasional",
   ]) {
     assert.ok(html.includes(label), `${label} is missing`);
   }
   assert.doesNotMatch(html, /Exception Board/);
+  assert.doesNotMatch(html, /Destination Rack &amp; Zone/);
 });
 
 test("uses explicit quantity-reconciliation labels instead of ambiguous variance wording", () => {
@@ -83,7 +83,6 @@ test("maps server-side aggregates into the live dashboard", () => {
   assert.match(html, /payload\.sla_breakdown/);
   assert.match(html, /payload\.vendor_breakdown/);
   assert.match(html, /payload\.manpower_breakdown/);
-  assert.match(html, /payload\.rack_breakdown/);
   assert.match(html, /payload\.reconciliation/);
   assert.doesNotMatch(html, /payload\.exceptions/);
 });

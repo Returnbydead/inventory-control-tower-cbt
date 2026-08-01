@@ -220,7 +220,7 @@
     .split-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); }
     .vertical-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-md); }
     .queue-vendor-stack,
-    .manpower-rack-stack { grid-template-columns: minmax(0, 1fr); }
+    .manpower-stack { grid-template-columns: minmax(0, 1fr); }
     .queue-vendor-stack .queue-section { order: -1; }
     .sla-layout { display: grid; gap: var(--space-md); }
     .sla-overview { display: grid; grid-template-columns: minmax(12rem, .8fr) minmax(0, 1.2fr); gap: var(--space-lg); align-items: end; }
@@ -437,7 +437,7 @@
           </div>
         </section>
 
-        <div class="split-row manpower-rack-stack">
+        <div class="split-row manpower-stack">
           <section class="section manpower-section">
             <header class="section-heading">
               <h2>Manpower Workload</h2>
@@ -451,18 +451,6 @@
             </div>
           </section>
 
-          <section class="section rack-section">
-            <header class="section-heading">
-              <h2>Destination Rack &amp; Zone</h2>
-              <span>Backlog untuk identifikasi titik konsentrasi</span>
-            </header>
-            <div class="table-shell tall">
-              <table>
-                <thead><tr><th class="left">Zone</th><th class="left">Destination Rack</th><th>Active Task</th><th>Active Qty</th><th>SKU</th><th>Breached</th><th>Urgent</th></tr></thead>
-                <tbody id="rackBody"></tbody>
-              </table>
-            </div>
-          </section>
         </div>
       </div>
     </main>
@@ -523,7 +511,6 @@
       exceptions: { summary: { grn_without_task: 0, task_without_gr: 0, missing_po: 0, missing_asset: 0, missing_vendor: 0, unassigned_manpower: 1 } },
       vendor_breakdown: [{ vendor_name: "Demo Vendor", completed_tasks: 1, completed_qty: 10, active_tasks: 2, active_qty: 32, breached_tasks: 1 }],
       manpower_breakdown: [{ staff_name: "Belum assign", active_tasks: 2, active_qty: 32, active_sku: 2, completed_tasks: 0, completed_qty: 0, completed_sku: 0, completed_within_sla: 0, completed_late: 0 }],
-      rack_breakdown: [{ zone: "SRA", to_rack_name: "CBT-SRA1-01-01-L1-01", active_tasks: 2, active_qty: 32, sku_count: 2, breached_tasks: 1, urgent_tasks: 0 }],
       filters: { vendors: ["Demo Vendor"], staff: [], zones: ["SRA"] },
       tasks: [
         { task_id: 2, task_number: "ID1/PUT/DEMO-2", package_label: "ATI/DEMO-2", purchase_order_number: "ID1/POR/DEMO", vendor_name: "Demo Vendor", staff_name: null, status: "IN_PROGRESS", received_at: "2026-07-26T00:00:00.000Z", remaining_minutes: -60, elapsed_minutes: 420, sla_state: "BREACHED", sku_count: 1, total_qty: 20, items: [{ product_sku: "SKU-2", product_name: "Demo Product 2", qty: 20, to_rack_name: "CBT-SRA1-01-01-L1-01" }] },
@@ -655,16 +642,6 @@
         { value: row => integer.format(numberValue(row.completed_within_sla)) },
         { value: row => integer.format(numberValue(row.completed_late)) },
       ], "Tidak ada data manpower untuk filter ini.");
-
-      tableBody("#rackBody", payload.rack_breakdown || [], [
-        { className: "left", value: row => row.zone },
-        { className: "left", value: row => row.to_rack_name },
-        { value: row => integer.format(numberValue(row.active_tasks)) },
-        { value: row => integer.format(numberValue(row.active_qty)) },
-        { value: row => integer.format(numberValue(row.sku_count)) },
-        { value: row => integer.format(numberValue(row.breached_tasks)) },
-        { value: row => integer.format(numberValue(row.urgent_tasks)) },
-      ], "Tidak ada destination rack aktif untuk filter ini.");
 
       populateSelect("#filterVendor", payload.filters?.vendors || [], "Semua vendor");
       populateSelect("#filterStaff", payload.filters?.staff || [], "Semua manpower");
