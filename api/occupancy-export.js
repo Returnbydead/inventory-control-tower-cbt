@@ -2,6 +2,10 @@ const { databaseName, getPool } = require("./sync-soh")._internal;
 const { evaluateCategory } = require("../lib/l1-placement");
 const { storageType } = require("../lib/occupancy");
 const { isExcludedOccupancyRack } = require("../lib/occupancy-exclusions");
+const {
+  buildPlanogramDetailRows,
+  filterPlanogramDetailRows,
+} = require("../lib/planogram-detail");
 
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
@@ -54,6 +58,32 @@ function exportRow(row, scope, snapshot) {
   ];
 }
 
+function planogramExportRow(row, scope, snapshot) {
+  const suggestions = Array.from({ length: 4 }, (_, index) => row.suggestions?.[index] || {});
+  return [
+    scope,
+    snapshot,
+    row.sku_number,
+    row.product_name,
+    row.l1_category_name,
+    row.l2_category_name,
+    row.rack_name,
+    row.zone,
+    row.aisle,
+    row.rack_sequence,
+    row.rack_level,
+    row.stock,
+    row.stock_value,
+    row.allowed_l1.join(" / "),
+    l1Status({ result: row.status }),
+    row.status,
+    row.wrong_qty,
+    row.wrong_value,
+    ...suggestions.flatMap((item) => [item.label || "", item.reason || ""]),
+    "Kandidat placement; cek kapasitas rack sebelum membuat movement task",
+  ];
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== "GET") {
     res.setHeader("Allow", "GET");
@@ -92,12 +122,30 @@ module.exports = async function handler(req, res) {
       return value > latest ? value : latest;
     }, "");
     const scope = zones.includes(ALL_ZONES) ? ALL_ZONES : zones.join(",");
+    const planogramDetail = clean(req.query.table).toLowerCase() === "planogram-sku-location";
     const headers = [[
       "Scope", "Snapshot", "Storage Area", "Zone", "SLOC / Rack", "Aisle", "Sequence", "Rack Level",
       "SKU", "Product Name", "L1 Aktual", "L2 Aktual", "Target L1", "Status L1", "Status Rule",
       "Qty", "Stock Value", "Source Rows",
     ]];
-    const csv = `\uFEFF${[...headers, ...rows.map((row) => exportRow(row, scope, snapshot))]
+    const planogramHeaders = [[
+      "Scope", "Snapshot", "SKU", "Product Name", "L1 Aktual", "L2 Aktual",
+      "Current Rack", "Current Zone", "Current Aisle", "Current Sequence", "Current Level",
+      "Qty", "Stock Value", "Target L1 at Current Rack", "Status L1", "Status Rule",
+      "Wrong Qty", "Value Risk",
+      "Suggestion 1 Location", "Suggestion 1 Basis",
+      "Suggestion 2 Location", "Suggestion 2 Basis",
+      "Suggestion 3 Location", "Suggestion 3 Basis",
+      "Suggestion 4 Location", "Suggestion 4 Basis",
+      "Operational Note",
+    ]];
+    const csvRows = planogramDetail
+      ? filterPlanogramDetailRows(buildPlanogramDetailRows(rows), {
+        status: req.query.status,
+        query: req.query.q,
+      }).map((row) => planogramExportRow(row, scope, snapshot))
+      : rows.map((row) => exportRow(row, scope, snapshot));
+    const csv = `\uFEFF${[...(planogramDetail ? planogramHeaders : headers), ...csvRows]
       .map((row) => row.map(csvValue).join(",")).join("\r\n")}`;
     const suffix = clean(req.query.table || "raw").replace(/[^a-z0-9_-]/gi, "-");
     const snapshotStamp = snapshot ? snapshot.replace(/[:.]/g, "-").slice(0, 19) : "snapshot";
@@ -113,4 +161,4 @@ module.exports = async function handler(req, res) {
   }
 };
 
-module.exports._test = { exportRow, l1Status, selectedZones };
+module.exports._test = { exportRow, l1Status, planogramExportRow, selectedZones };

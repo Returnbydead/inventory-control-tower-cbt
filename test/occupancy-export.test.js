@@ -1,6 +1,6 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { exportRow, selectedZones } = require("../api/occupancy-export")._test;
+const { exportRow, planogramExportRow, selectedZones } = require("../api/occupancy-export")._test;
 const { isExcludedOccupancyRack } = require("../lib/occupancy-exclusions");
 
 test("occupancy export keeps SKU x SLOC detail and L1 compliance", () => {
@@ -26,6 +26,34 @@ test("occupancy export keeps SKU x SLOC detail and L1 compliance", () => {
 
 test("occupancy export accepts multiple zones", () => {
   assert.deepEqual(selectedZones("MZA1,SRC1"), ["MZA1", "SRC1"]);
+});
+
+test("planogram detail export includes multiple location suggestions and their basis", () => {
+  const row = planogramExportRow({
+    sku_number: "899000000002",
+    product_name: "Cokelat Test",
+    l1_category_name: "Cokelat",
+    l2_category_name: "Cokelat Batang",
+    rack_name: "CBT-SRA1-09-01-L1-01",
+    zone: "SRA1",
+    aisle: 9,
+    rack_sequence: 1,
+    rack_level: "L1",
+    stock: 24,
+    stock_value: 100000,
+    allowed_l1: ["Minuman"],
+    status: "WRONG_L1",
+    wrong_qty: 24,
+    wrong_value: 100000,
+    suggestions: [
+      { label: "SRA1 · aisle 12", reason: "Teman SKU 40 qty" },
+      { label: "MZC2 · aisle 10", reason: "Cluster L1 200 qty" },
+    ],
+  }, "ALL", "2026-08-01T00:00:00.000Z");
+  assert.ok(row.includes("SRA1 · aisle 12"));
+  assert.ok(row.includes("MZC2 · aisle 10"));
+  assert.ok(row.includes("Teman SKU 40 qty"));
+  assert.ok(row.includes("Cluster L1 200 qty"));
 });
 
 test("occupancy export recognises every excluded non-storage location", () => {

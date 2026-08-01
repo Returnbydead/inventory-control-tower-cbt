@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   addressParts,
   evaluateCategory,
+  placementAreasForCategory,
   targetFor,
 } = require("../lib/l1-placement");
 const { aggregateRows, summarize, summarizeByZone, activateReadDatabase } = require("../api/rack-status")._test;
@@ -63,6 +64,21 @@ test("maps SRC1 aisles 04-06 to Kebutuhan Cuci Baju and keeps non-halal outside 
   assert.ok(excluded);
   const [zone, rackSequence] = excluded[0].split(":");
   assert.equal(targetFor(`CBT-${zone}-${rackSequence}-01-L1-01`).status, "EXCLUDED");
+});
+
+test("Cokelat exposes the approved SRA1 and MZC2 placement choices", () => {
+  assert.equal(
+    evaluateCategory("CBT-SRA1-12-01-L1-01", "Cokelat").result,
+    "COMPLIANT",
+  );
+  assert.equal(
+    evaluateCategory("CBT-MZC2-10-01-L1-01", "Cokelat").result,
+    "COMPLIANT",
+  );
+  const labels = placementAreasForCategory("Cokelat")
+    .map((area) => `${area.zone}:${area.aisle}`);
+  assert.ok(labels.includes("SRA1:12"));
+  assert.ok(labels.includes("MZC2:10"));
 });
 
 test("aggregates occupied SLOC and marks any wrong category as WRONG_L1", () => {

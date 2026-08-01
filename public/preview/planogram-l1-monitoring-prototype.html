@@ -54,6 +54,8 @@
     .section-heading { display: flex; align-items: end; justify-content: space-between; gap: var(--space-md); min-height: 4.25rem; padding: var(--space-md) var(--space-lg); border-block-end: 1px solid var(--rule); }
     .section-heading h1, .section-heading h2 { min-width: 0; margin: 0; overflow-wrap: anywhere; font-size: var(--text-md); line-height: 1.2; }
     .section-heading span { color: var(--ink-2); font-size: var(--text-sm); text-align: end; }
+    .section-actions { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-sm); }
+    .section-actions .button { min-height: 2.5rem; }
     .section-body { padding: var(--space-md) var(--space-lg) var(--space-lg); }
     .filter-grid { display: grid; grid-template-columns: minmax(10rem, .8fr) minmax(10rem, .8fr) minmax(16rem, 1.5fr) auto; align-items: end; gap: var(--space-sm); }
     .field { display: grid; min-width: 0; gap: var(--space-2xs); }
@@ -117,6 +119,13 @@
     .status-chip.correct { background: var(--safe-soft); color: var(--safe); }
     .status-chip.wrong { background: var(--danger-soft); color: var(--danger); }
     .status-chip.gap { background: var(--warning-soft); color: var(--ink); }
+    .sku-cell { display: grid; gap: var(--space-2xs); min-width: 13rem; }
+    .sku-cell strong { color: var(--ink); font-family: var(--font-mono); font-size: var(--text-sm); }
+    .sku-cell span { color: var(--ink-2); font-size: var(--text-xs); line-height: 1.25; }
+    .suggestion-list { display: grid; gap: var(--space-2xs); min-width: 17rem; }
+    .suggestion-item { display: grid; grid-template-columns: minmax(7.5rem, auto) minmax(0, 1fr); gap: var(--space-xs); align-items: baseline; }
+    .suggestion-item strong { color: var(--accent-strong); font-family: var(--font-mono); white-space: nowrap; }
+    .suggestion-item span { color: var(--ink-2); font-size: var(--text-xs); line-height: 1.25; }
     .empty { padding: var(--space-xl); color: var(--ink-2); text-align: center; }
     .error { margin: var(--space-lg); padding: var(--space-md); border: 1px solid var(--danger); background: var(--danger-soft); color: var(--ink); }
     .error strong { display: block; color: var(--danger); }
@@ -150,7 +159,7 @@
     <main class="workspace">
       <header class="topbar"><div class="crumb">Inventory Control Tower / <strong>Planogram Accuracy</strong></div><div class="top-actions"><button id="navToggle" class="button icon-button" type="button" aria-label="Sembunyikan atau tampilkan sidebar" aria-expanded="true">☰</button><span class="freshness" id="freshness">Mengambil live snapshot…</span><button class="button" id="resetFilter" type="button">Reset filter</button><button class="icon-button" id="refresh" type="button" aria-label="Refresh data">↻</button></div></header>
       <div class="dashboard">
-        <section class="section" id="planogram-filter"><header class="section-heading"><h1>Filter Planogram</h1><span>Seluruh KPI dan tabel memakai filter yang sama</span></header><div class="section-body"><div class="filter-grid"><div class="field"><label for="zonePickerSummary">Zone</label><details class="zone-picker"><summary id="zonePickerSummary">Semua zona</summary><div class="zone-picker-panel"><div class="zone-picker-actions"><button id="selectAllZones" type="button">Semua zona</button><button id="clearZones" type="button">Kosongkan</button></div><div id="zoneOptions" class="zone-options"></div></div></details></div><div class="field"><label for="statusFilter">Status L1</label><select id="statusFilter"><option value="">Semua status</option><option value="WRONG_L1">Wrong L1</option><option value="COMPLIANT">Correct</option><option value="NO_TARGET">No target</option></select></div><div class="field"><label for="searchFilter">Rack atau kategori L1</label><input id="searchFilter" placeholder="Contoh: SRC1, Minuman, 18-13"></div><button class="button" id="applyFilter" type="button">Terapkan filter</button></div><p class="filter-message" id="filterMessage">Memuat data L1…</p></div></section>
+        <section class="section" id="planogram-filter"><header class="section-heading"><h1>Filter Planogram</h1><span>Seluruh KPI dan tabel memakai filter yang sama</span></header><div class="section-body"><div class="filter-grid"><div class="field"><label for="zonePickerSummary">Zone</label><details class="zone-picker"><summary id="zonePickerSummary">Semua zona</summary><div class="zone-picker-panel"><div class="zone-picker-actions"><button id="selectAllZones" type="button">Semua zona</button><button id="clearZones" type="button">Kosongkan</button></div><div id="zoneOptions" class="zone-options"></div></div></details></div><div class="field"><label for="statusFilter">Status L1</label><select id="statusFilter"><option value="">Semua status</option><option value="WRONG_L1">Wrong L1</option><option value="COMPLIANT">Correct</option><option value="NO_TARGET">No target</option></select></div><div class="field"><label for="searchFilter">SKU, produk, rack, atau kategori L1</label><input id="searchFilter" placeholder="Contoh: 899, Royco, SRC1, Cokelat"></div><button class="button" id="applyFilter" type="button">Terapkan filter</button></div><p class="filter-message" id="filterMessage">Memuat data L1…</p></div></section>
 
         <section class="section" id="l1-accuracy"><header class="section-heading"><h2>L1 Accuracy</h2><span>Occupied SLOC dengan target L1 yang tervalidasi</span></header><div class="status-grid" id="statusGrid"></div></section>
 
@@ -158,7 +167,7 @@
 
         <section class="section" id="aisle-accuracy"><header class="section-heading"><h2>L1 Accuracy by Aisle</h2><span>Prioritas aisle dengan salah L1 terbanyak</span></header><div class="table-shell"><table><thead><tr><th class="left">Aisle</th><th>Occupied SLOC</th><th>Correct</th><th>Wrong L1</th><th>Wrong Qty</th><th>Accuracy</th></tr></thead><tbody id="aisleBody"></tbody></table></div></section>
 
-        <section class="section" id="l1-detail"><header class="section-heading"><h2>L1 Detail by Rack</h2><span>Current category dibanding target placement rules</span></header><div class="toolbar"><span>1 row = 1 occupied SLOC · saran = kandidat rack kompatibel, cek kapasitas dulu</span><strong id="detailCount">0 records</strong></div><div class="table-shell tall"><table><thead><tr><th class="left">Rack Name</th><th>Zone</th><th>Aisle</th><th>Sequence</th><th>Level</th><th class="left">Allowed L1</th><th class="left">Current L1</th><th>Quantity</th><th>Wrong Qty</th><th>Value Risk</th><th class="left">Saran Zone</th><th class="left">Saran Rack</th><th>Status</th></tr></thead><tbody id="detailBody"></tbody></table></div></section>
+        <section class="section" id="l1-detail"><header class="section-heading"><h2>L1 Detail per SKU &amp; Lokasi</h2><div class="section-actions"><span>Raw SOH dibanding target placement rules</span><button class="button" id="downloadDetail" type="button" disabled>Download CSV</button></div></header><div class="toolbar"><span>1 row = 1 SKU × occupied location · beberapa saran zona/aisle ditampilkan, cek kapasitas rack dulu</span><strong id="detailCount">Memuat detail…</strong></div><div class="table-shell tall"><table style="min-width: 112rem"><thead><tr><th class="left">SKU / Produk</th><th class="left">Current Rack</th><th>Zone</th><th>Aisle</th><th>Sequence</th><th>Level</th><th class="left">Current L1</th><th>Quantity</th><th>Wrong Qty</th><th>Value Risk</th><th class="left">Target di Lokasi Saat Ini</th><th class="left">Saran Placement</th><th class="left">Dasar Saran</th><th>Status</th></tr></thead><tbody id="detailBody"><tr><td class="empty" colspan="14">Memuat detail SKU per lokasi…</td></tr></tbody></table></div></section>
       </div>
     </main>
   </div>
@@ -169,6 +178,8 @@
     const previewApiOrigin = ['127.0.0.1', 'localhost'].includes(location.hostname) && location.port !== '4188' ? 'http://127.0.0.1:4188' : '';
     const rackStatusUrl = (selectedZones) => { const zones = selectedZones.includes('ALL') ? [] : selectedZones; const params = new URLSearchParams(zones.length ? { zones: zones.join(',') } : { zone: 'ALL' }); return `${previewApiOrigin}/api/rack-status?${params}`; };
     const clean = value => String(value ?? '').trim();
+    const detailParams = selectedZones => { const params = new URLSearchParams({ zones: selectedZones.includes('ALL') ? 'ALL' : selectedZones.join(','), limit: '500' }); const status = clean($('#statusFilter').value); const query = clean($('#searchFilter').value); if (status) params.set('status', status); if (query) params.set('q', query); return params; };
+    const planogramDetailUrl = selectedZones => `${previewApiOrigin}/api/planogram-detail?${detailParams(selectedZones)}`;
     const number = value => Number.isFinite(Number(value)) ? Number(value) : 0;
     const escapeHtml = value => clean(value).replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&#039;');
     const parseRack = rack => { const match = clean(rack).toUpperCase().match(/^[^-]+-([A-Z]+\d+)-(\d+)-(\d+)-L(\d+)-([^-]+)$/); return match ? { zone: match[1], aisle: Number(match[2]), sequence: Number(match[3]), level: `L${match[4]}` } : { zone: '—', aisle: null, sequence: null, level: '—' }; };
@@ -176,6 +187,7 @@
     const stateLabel = status => status === 'WRONG_L1' ? 'WRONG L1' : status === 'COMPLIANT' ? 'CORRECT' : 'NO TARGET';
     const statusChip = status => `<span class="status-chip ${stateClass(status)}">${stateLabel(status)}</span>`;
     let payload = null;
+    let detailPayload = null;
     let zones = [];
     let allZoneSummaries = [];
     const selectedZoneValues = () => [...document.querySelectorAll('#zoneOptions input:checked')].map(input => input.value);
@@ -192,8 +204,55 @@
     function accuracy(data) { const mapped = data.compliant + data.wrong; return mapped ? (data.compliant / mapped) * 100 : 0; }
     function quantityAccuracy(data) { return data.mapped_qty ? (data.correct_qty / data.mapped_qty) * 100 : 0; }
     function tableBody(selector, rows, columns, emptyText) { $(selector).innerHTML = rows.length ? rows.map(row => `<tr class="${row.status === 'WRONG_L1' ? 'priority' : ''}">${columns.map(column => `<td class="${column.left ? 'left' : ''}">${column.value(row)}</td>`).join('')}</tr>`).join('') : `<tr><td class="empty" colspan="${columns.length}">${escapeHtml(emptyText)}</td></tr>`; }
-    function compatibleRackIndex(rows) { const index = new Map(); rows.filter(row => row.status === 'COMPLIANT').forEach(row => row.l1_categories.forEach(category => { const candidates = index.get(category) || []; candidates.push(row); index.set(category, candidates); })); return index; }
-    function rackSuggestion(row, index) { if (row.status !== 'WRONG_L1') return null; for (const category of row.l1_categories) { const candidates = index.get(category) || []; const candidate = candidates.find(item => item.rack_name !== row.rack_name && item.address.zone === row.address.zone) || candidates.find(item => item.rack_name !== row.rack_name); if (candidate) return { zone: candidate.address.zone, rack: candidate.rack_name }; } return null; }
+    function suggestionCell(row, key) {
+      const items = row.suggestions || [];
+      if (!items.length) return '—';
+      return `<div class="suggestion-list">${items.map(item => `<div class="suggestion-item">${key === 'label' ? `<strong>${escapeHtml(item.label)}</strong>` : `<span>${escapeHtml(item.reason)}</span>`}</div>`).join('')}</div>`;
+    }
+    function renderDetails(data) {
+      detailPayload = data;
+      const rows = data?.rows || [];
+      $('#detailCount').textContent = data?.truncated ? `${integer.format(rows.length)} dari ${integer.format(data.total)} records · prioritas di atas` : `${integer.format(data?.total || 0)} records`;
+      $('#downloadDetail').disabled = !data?.ok;
+      tableBody('#detailBody', rows, [
+        { left: true, value: row => `<div class="sku-cell"><strong>${escapeHtml(row.sku_number || '—')}</strong><span>${escapeHtml(row.product_name || 'Produk belum terhubung')}</span></div>` },
+        { left: true, value: row => escapeHtml(row.rack_name) },
+        { value: row => escapeHtml(row.zone || '—') },
+        { value: row => Number.isFinite(Number(row.aisle)) ? String(row.aisle).padStart(2, '0') : '—' },
+        { value: row => row.rack_sequence || '—' },
+        { value: row => escapeHtml(row.rack_level || '—') },
+        { left: true, value: row => escapeHtml(row.l1_category_name || '—') },
+        { value: row => integer.format(number(row.stock)) },
+        { value: row => integer.format(number(row.wrong_qty)) },
+        { value: row => compactCurrency.format(number(row.wrong_value)) },
+        { left: true, value: row => escapeHtml((row.allowed_l1 || []).join(', ') || '—') },
+        { left: true, value: row => suggestionCell(row, 'label') },
+        { left: true, value: row => suggestionCell(row, 'reason') },
+        { value: row => statusChip(row.status) },
+      ], 'Tidak ada detail SKU × lokasi untuk filter ini.');
+    }
+    async function loadDetailData(selected) {
+      $('#downloadDetail').disabled = true;
+      $('#detailCount').textContent = 'Memuat detail…';
+      $('#detailBody').innerHTML = '<tr><td class="empty" colspan="14">Memuat detail SKU per lokasi…</td></tr>';
+      try {
+        const response = await fetch(planogramDetailUrl(selected), { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.message || 'Detail SKU tidak tersedia');
+        renderDetails(data);
+      } catch (error) {
+        detailPayload = null;
+        $('#detailCount').textContent = 'Detail unavailable';
+        $('#detailBody').innerHTML = `<tr><td class="empty" colspan="14">${escapeHtml(error.message)}</td></tr>`;
+      }
+    }
+    function downloadDetailCsv() {
+      if (!detailPayload?.ok) return;
+      const params = detailParams(selectedZoneValues());
+      params.set('table', 'planogram-sku-location');
+      params.delete('limit');
+      window.location.assign(`${previewApiOrigin}/api/occupancy-export?${params}`);
+    }
     function render() {
       if (!payload?.locations) {
         const total = uiSummary(payload?.summary); const mapped = total.compliant + total.wrong;
@@ -204,7 +263,7 @@
           { key: 'gap', label: 'No Target', value: total.noTarget, note: 'Tidak masuk denominator accuracy', metrics: [['Occupied', total.noTarget], ['No Target Qty', total.no_target_qty], ['Action', 'Map rule']] },
         ].map(card => `<article class="status-card ${card.key}"><div class="label"><span>${card.label}</span><small>${card.note}</small></div><strong>${integer.format(card.value)}</strong><div class="metric-strip">${card.metrics.map(([label, value]) => `<span>${label}<b>${typeof value === 'number' ? integer.format(value) : value}</b></span>`).join('')}</div></article>`).join('');
         $('#aisleBody').innerHTML = '<tr><td class="empty" colspan="6">Data aisle belum tersedia pada snapshot ini.</td></tr>';
-        $('#detailCount').textContent = '0 records'; $('#detailBody').innerHTML = '<tr><td class="empty" colspan="13">Data detail rack belum tersedia pada snapshot ini.</td></tr>';
+        $('#detailCount').textContent = '0 records'; $('#detailBody').innerHTML = '<tr><td class="empty" colspan="14">Data detail SKU belum tersedia pada snapshot ini.</td></tr>';
         return;
       }
       const rows = filteredLocations(); const total = summary(rows); const mapped = total.compliant + total.wrong;
@@ -219,10 +278,6 @@
       const aisles = [...aisleMap.values()].sort((a, b) => b.wrong_qty - a.wrong_qty || a.aisle - b.aisle);
       tableBody('#aisleBody', aisles, [{ left: true, value: row => `Aisle ${String(row.aisle).padStart(2, '0')}` }, { value: row => integer.format(row.occupied) }, { value: row => integer.format(row.correct) }, { value: row => integer.format(row.wrong) }, { value: row => integer.format(row.wrong_qty) }, { value: row => `${accuracy({ compliant: row.correct, wrong: row.wrong }).toFixed(1)}%` }], 'Tidak ada aisle untuk filter ini.');
 
-      const details = [...rows].sort((a, b) => (a.status === 'WRONG_L1' ? -1 : 1) - (b.status === 'WRONG_L1' ? -1 : 1) || number(b.wrong_qty) - number(a.wrong_qty));
-      const visibleDetails = details.slice(0, 500); const suggestions = compatibleRackIndex(rows);
-      $('#detailCount').textContent = details.length > visibleDetails.length ? `${integer.format(visibleDetails.length)} dari ${integer.format(details.length)} records · prioritas di atas` : `${integer.format(details.length)} records`;
-      tableBody('#detailBody', visibleDetails, [{ left: true, value: row => escapeHtml(row.rack_name) }, { value: row => escapeHtml(row.address.zone) }, { value: row => String(row.address.aisle ?? '—') }, { value: row => String(row.address.sequence ?? '—') }, { value: row => escapeHtml(row.address.level) }, { left: true, value: row => escapeHtml(row.allowed_l1.join(', ') || '—') }, { left: true, value: row => escapeHtml(row.l1_categories.join(', ') || '—') }, { value: row => integer.format(row.qty) }, { value: row => integer.format(row.wrong_qty) }, { value: row => compactCurrency.format(row.wrong_value) }, { left: true, value: row => escapeHtml(rackSuggestion(row, suggestions)?.zone || '—') }, { left: true, value: row => escapeHtml(rackSuggestion(row, suggestions)?.rack || '—') }, { value: row => statusChip(row.status) }], 'Tidak ada SLOC untuk filter ini.');
     }
     function renderAllZoneAccuracyLegacy() {
       const total = allZoneSummaries.reduce((acc, zone) => Object.entries(zone).reduce((next, [key, value]) => { if (typeof value === 'number') next[key] = (next[key] || 0) + value; return next; }, acc), {});
@@ -283,11 +338,11 @@
     }
     function updateZoneOptions() { const requested = clean(new URLSearchParams(location.search).get('zones')).split(',').map(value => value.trim().toUpperCase()).filter(value => zones.includes(value)); const fallback = clean(new URLSearchParams(location.search).get('zone')).toUpperCase(); const selected = requested.length ? requested : zones.includes(fallback) ? [fallback] : ['ALL']; $('#zoneOptions').innerHTML = `<label class="zone-option"><input type="checkbox" value="ALL">Semua zona</label>${zones.map(zone => `<label class="zone-option"><input type="checkbox" value="${escapeHtml(zone)}">${escapeHtml(zone)}</label>`).join('')}`; setSelectedZones(selected); }
     async function loadRules() { const response = await fetch('/data/l1-placement-rules.json'); if (!response.ok) throw new Error('Placement rules tidak dapat dimuat'); const rules = await response.json(); zones = [...new Set(Object.keys(rules.rules || {}).map(key => key.split(':')[0]))].sort(); updateZoneOptions(); }
-    async function loadData() { const selected = selectedZoneValues(); const overview = selected.includes('ALL'); if (!selected.length) { $('#filterMessage').textContent = 'Pilih minimal satu zona terlebih dahulu.'; return; } $('#refresh').disabled = true; $('#statusFilter').disabled = false; $('#searchFilter').disabled = false; $('#freshness').textContent = 'Mengambil live snapshot…'; try { const response = await fetch(rackStatusUrl(selected), { cache: 'no-store' }); const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.message || 'Snapshot L1 tidak tersedia'); payload = data; const url = new URL(location.href); url.searchParams.delete('zone'); url.searchParams.delete('zones'); if (overview) url.searchParams.set('zone', 'ALL'); else url.searchParams.set('zones', selected.join(',')); history.replaceState({}, '', url); $('#freshness').textContent = data.snapshot_at ? `Live · ${new Date(data.snapshot_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}` : 'Live snapshot'; render(); await loadAllZoneAccuracy(selected, data); } catch (error) { $('.dashboard').insertAdjacentHTML('afterbegin', `<section class="error"><strong>Snapshot L1 belum bisa dimuat.</strong>${escapeHtml(error.message)}</section>`); $('#freshness').textContent = 'Live unavailable'; } finally { $('#refresh').disabled = false; } }
+    async function loadData() { const selected = selectedZoneValues(); const overview = selected.includes('ALL'); if (!selected.length) { $('#filterMessage').textContent = 'Pilih minimal satu zona terlebih dahulu.'; return; } $('#refresh').disabled = true; $('#statusFilter').disabled = false; $('#searchFilter').disabled = false; $('#freshness').textContent = 'Mengambil live snapshot…'; try { const response = await fetch(rackStatusUrl(selected), { cache: 'no-store' }); const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.message || 'Snapshot L1 tidak tersedia'); payload = data; const url = new URL(location.href); url.searchParams.delete('zone'); url.searchParams.delete('zones'); if (overview) url.searchParams.set('zone', 'ALL'); else url.searchParams.set('zones', selected.join(',')); history.replaceState({}, '', url); $('#freshness').textContent = data.snapshot_at ? `Live · ${new Date(data.snapshot_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}` : 'Live snapshot'; render(); await Promise.all([loadAllZoneAccuracy(selected, data), loadDetailData(selected)]); } catch (error) { $('.dashboard').insertAdjacentHTML('afterbegin', `<section class="error"><strong>Snapshot L1 belum bisa dimuat.</strong>${escapeHtml(error.message)}</section>`); $('#freshness').textContent = 'Live unavailable'; } finally { $('#refresh').disabled = false; } }
     async function loadAllZoneAccuracy(selected = selectedZoneValues(), data = payload) { const setReport = source => { const summaries = source.zone_summaries || {}; const reportZones = selected.includes('ALL') ? Object.keys(summaries) : selected; allZoneSummaries = reportZones.map(zone => ({ zone, ...uiSummary(summaries[zone]) })).sort((a, b) => a.zone.localeCompare(b.zone)); $('#allZoneMessage').innerHTML = `<strong>${integer.format(allZoneSummaries.length)} zona</strong> · % SLOC dan % Quantity dihitung hanya dari SLOC yang memiliki target L1.`; renderAllZoneAccuracy(); }; if (data?.zone_summaries) { setReport(data); return; } const activeZone = selected[0]; allZoneSummaries = [{ zone: activeZone, ...uiSummary(data?.summary) }]; $('#allZoneMessage').innerHTML = `<strong>${escapeHtml(activeZone)}</strong> · report mengikuti zona yang dipilih.`; renderAllZoneAccuracy(); }
     function resetFilter() { $('#statusFilter').value = ''; $('#searchFilter').value = ''; setSelectedZones(['ALL']); loadData(); }
     $('#navToggle').addEventListener('click', () => { const collapsed = document.body.classList.toggle('nav-collapsed'); $('#navToggle').setAttribute('aria-expanded', String(!collapsed)); });
-    $('#applyFilter').addEventListener('click', loadData); $('#resetFilter').addEventListener('click', resetFilter); $('#refresh').addEventListener('click', loadData); $('#selectAllZones').addEventListener('click', () => setSelectedZones(['ALL'])); $('#clearZones').addEventListener('click', () => setSelectedZones([])); $('#zoneOptions').addEventListener('change', event => { const changed = event.target; if (!changed.matches('input')) return; if (changed.value === 'ALL' && changed.checked) setSelectedZones(['ALL']); else if (changed.value !== 'ALL') { const checked = selectedZoneValues().filter(value => value !== 'ALL'); setSelectedZones(checked); } else updateZonePickerSummary(); }); $('#searchFilter').addEventListener('keydown', event => { if (event.key === 'Enter') loadData(); });
+    $('#applyFilter').addEventListener('click', loadData); $('#resetFilter').addEventListener('click', resetFilter); $('#refresh').addEventListener('click', loadData); $('#downloadDetail').addEventListener('click', downloadDetailCsv); $('#selectAllZones').addEventListener('click', () => setSelectedZones(['ALL'])); $('#clearZones').addEventListener('click', () => setSelectedZones([])); $('#zoneOptions').addEventListener('change', event => { const changed = event.target; if (!changed.matches('input')) return; if (changed.value === 'ALL' && changed.checked) setSelectedZones(['ALL']); else if (changed.value !== 'ALL') { const checked = selectedZoneValues().filter(value => value !== 'ALL'); setSelectedZones(checked); } else updateZonePickerSummary(); }); $('#searchFilter').addEventListener('keydown', event => { if (event.key === 'Enter') loadData(); });
     (async () => { try { await loadRules(); await loadData(); } catch (error) { $('.dashboard').innerHTML = `<section class="error"><strong>Preview belum bisa disiapkan.</strong>${escapeHtml(error.message)}</section>`; } })();
   </script>
 </body>

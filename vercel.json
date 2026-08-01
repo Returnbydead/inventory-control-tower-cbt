@@ -28,6 +28,9 @@
     "api/occupancy-dashboard.js": {
       "maxDuration": 60
     },
+    "api/planogram-detail.js": {
+      "maxDuration": 60
+    },
     "api/sync-putaway.js": {
       "maxDuration": 300
     }

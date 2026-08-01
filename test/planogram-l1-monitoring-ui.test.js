@@ -61,10 +61,14 @@ test("planogram supports checkbox selection for multiple zones", () => {
 test("planogram renders all-zone operational details without the retired priority panel", () => {
   for (const marker of [
     'id="aisle-accuracy"',
-    "compatibleRackIndex",
-    "Saran Zone",
-    "Saran Rack",
-    "visibleDetails = details.slice(0, 500)",
+    "L1 Detail per SKU &amp; Lokasi",
+    "planogramDetailUrl",
+    "Saran Placement",
+    "Dasar Saran",
+    'id="downloadDetail"',
+    "planogram-sku-location",
+    "1 SKU × occupied location",
   ]) assert.ok(html.includes(marker), `${marker} is missing`);
   assert.ok(!html.includes('id="priority-rack"'), "retired priority rack panel is still present");
+  assert.ok(!html.includes("compatibleRackIndex"), "retired rack-only suggestion engine is still present");
 });
