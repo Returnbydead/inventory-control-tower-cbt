@@ -480,6 +480,14 @@
     const formatTime = value => value
       ? new Date(value).toLocaleTimeString("id-ID", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit" })
       : "—";
+    const formatDateTime = value => {
+      if (!value) return "—";
+      const date = value instanceof Date ? value : new Date(value);
+      if (Number.isNaN(date.getTime())) return "—";
+      const day = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", day: "numeric", month: "short" }).format(date);
+      const time = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false }).format(date);
+      return `${day} ${time}`;
+    };
     const labelStatus = value => cleanText(value).replaceAll("_", " ");
 
     const demoPayload = {
@@ -610,7 +618,7 @@
         { value: row => formatDuration(row.elapsed_minutes) },
         { className: row => numberValue(row.remaining_minutes) < 0 ? "sla-negative" : "", value: row => numberValue(row.remaining_minutes) < 0 ? formatDuration(row.remaining_minutes) : "-" },
         { value: row => labelStatus(row.status) },
-        { value: row => row.received_at ? "Done GR" : "GR not linked" },
+        { value: row => row.received_at ? formatDateTime(row.received_at) : "GR not linked" },
         { value: row => integer.format(numberValue(row.sku_count)) },
         { value: row => integer.format(numberValue(row.total_qty)) },
       ], "Tidak ada active task untuk filter ini.");
@@ -618,7 +626,7 @@
       const details = activeTasks.flatMap(task => (task.items || []).map(item => ({ task, item })));
       document.querySelector("#detailCount").textContent = `${integer.format(details.length)} records`;
       tableBody("#detailBody", details, [
-        { value: row => formatTime(row.task.received_at) },
+        { value: row => formatDateTime(row.task.received_at) },
         { className: "left", value: row => row.task.vendor_name || "Vendor belum linked" },
         { value: row => row.task.purchase_order_number || "PO belum linked" },
         { value: row => row.item.product_sku || "SKU belum linked" },
@@ -627,7 +635,7 @@
         { value: row => formatHours(row.task.remaining_minutes) },
         { value: row => `${integer.format(numberValue(row.task.elapsed_minutes))} min` },
         { value: row => labelStatus(row.task.status) },
-        { value: row => row.task.received_at ? "Done GR" : "GR not linked" },
+        { value: row => row.task.received_at ? formatDateTime(row.task.received_at) : "GR not linked" },
         { className: "left", value: row => row.item.to_rack_name || "Rack belum linked" },
       ], "Tidak ada detail SKU active untuk filter ini.");
 
