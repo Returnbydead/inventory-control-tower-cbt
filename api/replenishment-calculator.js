@@ -236,7 +236,28 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
       storage: [],
       all: [],
     };
+    // PARAM bisa berisi SKU yang sudah tidak memiliki stock di snapshot SOH.
+    // SKU tanpa baris SOH bukan kandidat replenishment dan tidak boleh
+    // menambah required qty maupun shortage qty.
+    if (!group.all.length) {
+      skuRows.push({
+        product_id: clean(param.product_id),
+        sku_number: param.sku_number,
+        product_name: clean(param.product_name),
+        doi: rounded(doi),
+        max_pf: param.max_pf,
+        target_pf: rounded(param.max_pf * doi),
+        pickface_stock: 0,
+        replenish_qty: 0,
+        allocated_qty: 0,
+        shortage_qty: 0,
+        source_count: 0,
+        task_count: 0,
+        status: "NO_SOH",
+      });
 
+      continue;
+    }
     const productId = clean(
       param.product_id || group.all.find((row) => row.product_id)?.product_id,
     );
@@ -382,14 +403,27 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
     snapshot_at: snapshotAt,
     summary: {
       param_sku_count: params.length,
-      replenishment_sku_count: skuRows.filter((row) => row.replenish_qty > 0)
+
+      soh_sku_count: skuRows.filter((row) => row.status !== "NO_SOH").length,
+
+      missing_soh_sku_count: skuRows.filter((row) => row.status === "NO_SOH")
         .length,
+
+      replenishment_sku_count: skuRows.filter(
+        (row) => row.status !== "NO_SOH" && row.replenish_qty > 0,
+      ).length,
+
+      task_sku_count: new Set(candidates.map((task) => task.sku_number)).size,
+
       ready_sku_count: skuRows.filter((row) => row.status === "READY").length,
+
       partial_sku_count: skuRows.filter((row) => row.status === "PARTIAL")
         .length,
+
       stock_not_enough_sku_count: skuRows.filter(
         (row) => row.status === "STOCK_NOT_ENOUGH",
       ).length,
+
       task_count: candidates.length,
       required_qty: rounded(totalRequiredQty),
       allocated_qty: rounded(totalAllocatedQty),
