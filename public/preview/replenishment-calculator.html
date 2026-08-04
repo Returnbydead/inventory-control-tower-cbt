@@ -1,0 +1,1279 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta name="robots" content="noindex" />
+    <title>Replenishment Calculator · Inventory Control Tower</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      :root {
+        --paper: oklch(98% 0.008 235);
+        --paper-2: oklch(95.5% 0.012 235);
+        --paper-3: oklch(92% 0.016 235);
+        --surface: oklch(99.4% 0.004 235);
+        --ink: oklch(20% 0.025 245);
+        --ink-2: oklch(43% 0.028 245);
+        --rule: oklch(84% 0.02 235);
+        --rule-strong: oklch(71% 0.035 235);
+        --accent: oklch(62% 0.15 225);
+        --accent-strong: oklch(48% 0.14 225);
+        --accent-soft: oklch(93% 0.035 225);
+        --accent-ink: oklch(16% 0.04 235);
+        --safe: oklch(56% 0.13 155);
+        --safe-soft: oklch(93% 0.04 155);
+        --warning: oklch(72% 0.14 78);
+        --warning-soft: oklch(95% 0.05 78);
+        --danger: oklch(57% 0.19 28);
+        --danger-soft: oklch(94% 0.035 28);
+        --focus: oklch(46% 0.18 225);
+        --sidebar: oklch(18% 0.035 245);
+        --sidebar-ink: oklch(96% 0.015 235);
+        --sidebar-muted: oklch(76% 0.03 235);
+
+        --space-3xs: 0.125rem;
+        --space-2xs: 0.25rem;
+        --space-xs: 0.5rem;
+        --space-sm: 0.75rem;
+        --space-md: 1rem;
+        --space-lg: 1.5rem;
+        --space-xl: 2.5rem;
+
+        --font-body: "Geist", ui-sans-serif, sans-serif;
+        --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+        --text-xs: 0.8rem;
+        --text-sm: 0.9rem;
+        --text-base: 1rem;
+        --text-md: 1.25rem;
+        --text-lg: 1.5625rem;
+
+        --radius: 0.375rem;
+        --control-height: 2.75rem;
+        --sidebar-width: 18.75rem;
+        --z-sticky: 200;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+        margin: 0;
+        overflow-x: clip;
+      }
+
+      body {
+        background: var(--paper-2);
+        color: var(--ink);
+        font: var(--text-base)/1.5 var(--font-body);
+      }
+
+      button,
+      input,
+      select {
+        min-height: var(--control-height);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        outline: 2px solid transparent;
+        outline-offset: 1px;
+        background: var(--surface);
+        color: var(--ink);
+        font: inherit;
+      }
+
+      button {
+        padding-inline: var(--space-md);
+        cursor: pointer;
+        white-space: nowrap;
+      }
+
+      button:hover {
+        border-color: var(--rule-strong);
+        background: var(--paper);
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+        opacity: 0.5;
+      }
+
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline-color: var(--focus);
+      }
+
+      input,
+      select {
+        width: 100%;
+        padding-inline: var(--space-sm);
+      }
+
+      .primary-button {
+        border-color: var(--accent);
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 700;
+      }
+
+      .primary-button:hover {
+        background: var(--accent-strong);
+        color: white;
+      }
+
+      .sidebar {
+        position: fixed;
+        inset: 0 auto 0 0;
+        z-index: var(--z-sticky);
+        display: flex;
+        flex-direction: column;
+        width: var(--sidebar-width);
+        padding: var(--space-lg) var(--space-md);
+        gap: var(--space-lg);
+        overflow-y: auto;
+        background: var(--sidebar);
+        color: var(--sidebar-ink);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+
+      .brand-mark {
+        display: grid;
+        place-items: center;
+        width: 3.25rem;
+        height: 3.25rem;
+        border-radius: var(--radius);
+        background: var(--accent);
+        color: var(--accent-ink);
+        font: 700 1rem var(--font-mono);
+      }
+
+      .brand strong,
+      .brand span {
+        display: block;
+      }
+
+      .brand span,
+      .side-foot {
+        color: var(--sidebar-muted);
+        font-size: var(--text-sm);
+      }
+
+      .side-nav {
+        display: grid;
+        gap: var(--space-xs);
+      }
+
+      .nav-label {
+        margin: var(--space-md) 0 var(--space-2xs);
+        color: var(--sidebar-muted);
+        font: var(--text-xs) var(--font-mono);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .side-link {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+        min-height: var(--control-height);
+        padding-inline: var(--space-sm);
+        border-radius: var(--radius);
+        color: var(--sidebar-muted);
+        text-decoration: none;
+        white-space: nowrap;
+      }
+
+      .side-link:hover {
+        color: var(--sidebar-ink);
+        background: var(--paper-3);
+      }
+
+      .side-link[aria-current="page"] {
+        background: var(--accent);
+        color: var(--accent-ink);
+        font-weight: 700;
+      }
+
+      .side-icon {
+        width: 1.5rem;
+        text-align: center;
+        font-family: var(--font-mono);
+      }
+
+      .side-foot {
+        margin-top: auto;
+      }
+
+      .connection {
+        display: inline-block;
+        width: 0.625rem;
+        height: 0.625rem;
+        margin-right: var(--space-xs);
+        border-radius: 50%;
+        background: var(--safe);
+      }
+
+      .workspace {
+        min-width: 0;
+        margin-left: var(--sidebar-width);
+      }
+
+      .topbar {
+        position: sticky;
+        top: 0;
+        z-index: var(--z-sticky);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-md);
+        min-height: 4.5rem;
+        padding: var(--space-sm) var(--space-xl);
+        border-bottom: 1px solid var(--rule);
+        background: var(--surface);
+      }
+
+      .crumb {
+        min-width: 0;
+        color: var(--ink-2);
+        font-size: var(--text-sm);
+      }
+
+      .crumb strong {
+        color: var(--ink);
+      }
+
+      .top-actions {
+        display: flex;
+        align-items: center;
+        gap: var(--space-sm);
+      }
+
+      .freshness {
+        color: var(--accent-strong);
+        font-weight: 700;
+        font-size: var(--text-sm);
+        white-space: nowrap;
+      }
+
+      .freshness::before {
+        content: "";
+        display: inline-block;
+        width: 0.55rem;
+        height: 0.55rem;
+        margin-right: var(--space-xs);
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .dashboard {
+        display: grid;
+        gap: var(--space-md);
+        padding: var(--space-md);
+      }
+
+      .section {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        background: var(--surface);
+      }
+
+      .section-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: var(--space-md);
+        min-height: 4.25rem;
+        padding: var(--space-md) var(--space-lg);
+        border-bottom: 1px solid var(--rule);
+      }
+
+      .section-heading h1,
+      .section-heading h2 {
+        margin: 0;
+        font-size: var(--text-md);
+        line-height: 1.2;
+      }
+
+      .section-heading span {
+        color: var(--ink-2);
+        font-size: var(--text-sm);
+        text-align: end;
+      }
+
+      .section-body {
+        padding: var(--space-md) var(--space-lg) var(--space-lg);
+      }
+
+      .control-grid {
+        display: grid;
+        grid-template-columns:
+          minmax(10rem, 0.5fr)
+          minmax(15rem, 1fr)
+          minmax(12rem, 0.7fr)
+          auto
+          auto;
+        align-items: end;
+        gap: var(--space-sm);
+      }
+
+      .field {
+        display: grid;
+        gap: var(--space-2xs);
+      }
+
+      .field label {
+        color: var(--ink-2);
+        font-size: var(--text-sm);
+      }
+
+      .helper {
+        margin: var(--space-sm) 0 0;
+        color: var(--ink-2);
+        font-size: var(--text-sm);
+      }
+
+      .message {
+        display: none;
+        margin-top: var(--space-sm);
+        padding: var(--space-sm);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        font-size: var(--text-sm);
+      }
+
+      .message.show {
+        display: block;
+      }
+
+      .message.success {
+        border-color: var(--safe);
+        background: var(--safe-soft);
+      }
+
+      .message.error {
+        border-color: var(--danger);
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+      }
+
+      .kpi {
+        min-width: 0;
+        padding: var(--space-lg);
+        border-right: 1px solid var(--rule);
+      }
+
+      .kpi:last-child {
+        border-right: 0;
+      }
+
+      .kpi span {
+        display: block;
+        color: var(--ink-2);
+        font-size: var(--text-sm);
+      }
+
+      .kpi strong {
+        display: block;
+        margin: var(--space-sm) 0 var(--space-2xs);
+        font-size: clamp(1.7rem, 2.5vw, 2.3rem);
+        line-height: 1;
+        letter-spacing: -0.045em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .kpi small {
+        color: var(--ink-2);
+        font-size: var(--text-xs);
+      }
+
+      .kpi.safe strong {
+        color: var(--safe);
+      }
+
+      .kpi.warning strong {
+        color: var(--warning);
+      }
+
+      .kpi.danger strong {
+        color: var(--danger);
+      }
+
+      .ledger-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: var(--space-sm);
+        padding: var(--space-sm) var(--space-lg);
+        border-bottom: 1px solid var(--rule);
+        color: var(--ink-2);
+        font-size: var(--text-sm);
+      }
+
+      .ledger-head strong {
+        color: var(--ink);
+        white-space: nowrap;
+      }
+
+      .table-shell {
+        max-height: 40rem;
+        overflow: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 94rem;
+        border-collapse: collapse;
+        font-size: var(--text-sm);
+        font-variant-numeric: tabular-nums;
+      }
+
+      th,
+      td {
+        padding: var(--space-xs) var(--space-sm);
+        border-right: 1px solid var(--rule);
+        border-bottom: 1px solid var(--rule);
+        text-align: end;
+        vertical-align: middle;
+      }
+
+      th:last-child,
+      td:last-child {
+        border-right: 0;
+      }
+
+      th {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        background: var(--paper-2);
+        white-space: nowrap;
+      }
+
+      th.left,
+      td.left {
+        text-align: start;
+      }
+
+      th.center,
+      td.center {
+        text-align: center;
+      }
+
+      .sku-cell strong,
+      .sku-cell span {
+        display: block;
+      }
+
+      .sku-cell span {
+        max-width: 22rem;
+        color: var(--ink-2);
+        overflow-wrap: anywhere;
+      }
+
+      .rack-cell {
+        font-family: var(--font-mono);
+        font-size: var(--text-xs);
+        white-space: nowrap;
+      }
+
+      .muted {
+        color: var(--ink-2);
+      }
+
+      .status {
+        display: inline-block;
+        padding: var(--space-3xs) var(--space-xs);
+        border: 1px solid var(--rule);
+        border-radius: var(--radius);
+        color: var(--ink-2);
+        font: 700 var(--text-xs)/1 var(--font-mono);
+        white-space: nowrap;
+      }
+
+      .status.ready {
+        border-color: var(--safe);
+        background: var(--safe-soft);
+        color: var(--safe);
+      }
+
+      .status.partial {
+        border-color: var(--warning);
+        background: var(--warning-soft);
+        color: var(--ink);
+      }
+
+      .status.stock-not-enough {
+        border-color: var(--danger);
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .empty {
+        padding: var(--space-xl);
+        color: var(--ink-2);
+        text-align: center;
+      }
+
+      input[type="checkbox"] {
+        width: 1.1rem;
+        min-height: 1.1rem;
+        accent-color: var(--accent-strong);
+      }
+
+      @media (max-width: 88rem) {
+        .kpi-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .kpi:nth-child(3) {
+          border-right: 0;
+        }
+
+        .kpi:nth-child(n + 4) {
+          border-top: 1px solid var(--rule);
+        }
+
+        .control-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 64rem) {
+        .sidebar {
+          display: none;
+        }
+
+        .workspace {
+          margin-left: 0;
+        }
+
+        .topbar {
+          padding-inline: var(--space-md);
+        }
+
+        .control-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .kpi-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .kpi:nth-child(odd) {
+          border-right: 1px solid var(--rule);
+        }
+
+        .kpi:nth-child(even) {
+          border-right: 0;
+        }
+
+        .kpi:nth-child(n + 3) {
+          border-top: 1px solid var(--rule);
+        }
+      }
+
+      @media (max-width: 42rem) {
+        .dashboard {
+          padding: var(--space-xs);
+        }
+
+        .topbar {
+          align-items: flex-start;
+        }
+
+        .top-actions {
+          flex-direction: column;
+          align-items: end;
+        }
+
+        .section-heading {
+          display: block;
+          min-height: auto;
+        }
+
+        .section-heading span {
+          display: block;
+          margin-top: var(--space-2xs);
+          text-align: start;
+        }
+
+        .control-grid,
+        .kpi-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .kpi {
+          border-right: 0 !important;
+          border-bottom: 1px solid var(--rule);
+        }
+
+        .kpi:last-child {
+          border-bottom: 0;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">IC</div>
+        <div>
+          <strong>Inventory Tower</strong>
+          <span>CBT · Operations</span>
+        </div>
+      </div>
+
+      <nav class="side-nav" aria-label="Navigasi utama">
+        <span class="nav-label">Control center</span>
+
+        <a class="side-link" href="/putaway">
+          <span class="side-icon">P</span>
+          <span>Putaway Monitoring</span>
+        </a>
+
+        <a class="side-link" href="/sra1-spatial-prototype.html">
+          <span class="side-icon">S</span>
+          <span>3D Rack View</span>
+        </a>
+
+        <span class="nav-label">Inventory</span>
+
+        <a
+          class="side-link"
+          href="/preview/planogram-l1-monitoring-prototype.html?zone=ALL"
+        >
+          <span class="side-icon">A</span>
+          <span>Planogram Accuracy</span>
+        </a>
+
+        <a class="side-link" href="/occupancy">
+          <span class="side-icon">O</span>
+          <span>Occupancy</span>
+        </a>
+
+        <a class="side-link" aria-current="page" href="/replenishment">
+          <span class="side-icon">R</span>
+          <span>Replenishment Calculator</span>
+        </a>
+
+        <a
+          class="side-link"
+          href="/preview/mzc2-sku-rebalancing-prototype.html"
+        >
+          <span class="side-icon">M</span>
+          <span>MZC2 Rebalancing</span>
+        </a>
+
+        <a
+          class="side-link"
+          href="/sra1-spatial-prototype.html#lost-monitoring"
+        >
+          <span class="side-icon">L</span>
+          <span>Lost Monitoring</span>
+        </a>
+      </nav>
+
+      <div class="side-foot">
+        <span class="connection"></span>
+        <span>Live environment</span>
+      </div>
+    </aside>
+
+    <main class="workspace">
+      <header class="topbar">
+        <div class="crumb">
+          Inventory Control Tower /
+          <strong>Replenishment Calculator</strong>
+        </div>
+
+        <div class="top-actions">
+          <span id="freshness" class="freshness">Menunggu kalkulasi…</span>
+          <button id="refreshButton" type="button">Refresh</button>
+        </div>
+      </header>
+
+      <div class="dashboard">
+        <section class="section">
+          <header class="section-heading">
+            <h1>Generate Replenishment Task</h1>
+            <span>PARAM × DOI dibandingkan dengan live SOH Pickface</span>
+          </header>
+
+          <div class="section-body">
+            <div class="control-grid">
+              <div class="field">
+                <label for="doiInput">DOI</label>
+                <input
+                  id="doiInput"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  value="1"
+                />
+              </div>
+
+              <div class="field">
+                <label for="searchInput"
+                  >Cari SKU, produk, atau source rack</label
+                >
+                <input
+                  id="searchInput"
+                  type="search"
+                  placeholder="Contoh: 899, Indomie, CBT-SRA1"
+                />
+              </div>
+
+              <div class="field">
+                <label for="statusFilter">Status kandidat</label>
+                <select id="statusFilter">
+                  <option value="">Semua status</option>
+                  <option value="READY">Ready</option>
+                  <option value="PARTIAL">Partial</option>
+                  <option value="STOCK_NOT_ENOUGH">Stock Not Enough</option>
+                </select>
+              </div>
+
+              <button id="calculateButton" type="button">Hitung Ulang</button>
+
+              <button
+                id="generateButton"
+                class="primary-button"
+                type="button"
+                disabled
+              >
+                Generate Task Terpilih
+              </button>
+            </div>
+
+            <p id="helper" class="helper">Calculator belum dimuat.</p>
+
+            <div id="message" class="message" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <section class="section">
+          <header class="section-heading">
+            <h2>Ringkasan Kalkulasi</h2>
+            <span>Hasil menggunakan DOI dan snapshot SOH terbaru</span>
+          </header>
+
+          <div id="kpiGrid" class="kpi-grid"></div>
+        </section>
+
+        <section class="section">
+          <header class="section-heading">
+            <h2>Kandidat Replenishment Task</h2>
+            <span>Source storage dengan stock paling kecil diprioritaskan</span>
+          </header>
+
+          <div class="ledger-head">
+            <label>
+              <input id="selectAll" type="checkbox" />
+              Pilih semua task yang tampil
+            </label>
+
+            <strong id="taskCount">0 task</strong>
+          </div>
+
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th class="center">Pilih</th>
+                  <th class="left">SKU / Produk</th>
+                  <th>DOI</th>
+                  <th>Max PF</th>
+                  <th>Target PF</th>
+                  <th>Stock PF</th>
+                  <th>Need Replenish</th>
+                  <th class="left">Source Rack</th>
+                  <th>Source Stock</th>
+                  <th>Allocated</th>
+                  <th class="left">Saran Tujuan</th>
+                  <th>Shortage</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+
+              <tbody id="taskBody">
+                <tr>
+                  <td class="empty" colspan="13">Menunggu kalkulasi.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const API_URL = "/api/replenishment-calculator";
+
+      const integerFormat = new Intl.NumberFormat("id-ID", {
+        maximumFractionDigits: 3,
+      });
+
+      const selectedTaskKeys = new Set();
+
+      let calculatorPayload = null;
+      let loading = false;
+
+      const byId = (id) => document.getElementById(id);
+
+      const clean = (value) => String(value ?? "").trim();
+
+      const numberValue = (value) => {
+        const parsed = Number(value);
+        return Number.isFinite(parsed) ? parsed : 0;
+      };
+
+      const qty = (value) => integerFormat.format(numberValue(value));
+
+      const escapeHtml = (value) =>
+        clean(value)
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+
+      function formatSnapshot(value) {
+        if (!value) return "Snapshot tidak tersedia";
+
+        const date = new Date(value);
+
+        if (Number.isNaN(date.getTime())) {
+          return "Snapshot tidak tersedia";
+        }
+
+        return new Intl.DateTimeFormat("id-ID", {
+          timeZone: "Asia/Jakarta",
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit",
+          hour12: false,
+        }).format(date);
+      }
+
+      function showMessage(text, type = "") {
+        const element = byId("message");
+
+        element.textContent = text;
+        element.className = `message show ${type}`.trim();
+      }
+
+      function clearMessage() {
+        const element = byId("message");
+
+        element.textContent = "";
+        element.className = "message";
+      }
+
+      function statusClass(status) {
+        if (status === "READY") return "ready";
+        if (status === "PARTIAL") return "partial";
+        return "stock-not-enough";
+      }
+
+      function visibleTasks() {
+        const tasks = Array.isArray(calculatorPayload?.tasks)
+          ? calculatorPayload.tasks
+          : [];
+
+        const query = clean(byId("searchInput").value).toLowerCase();
+        const status = clean(byId("statusFilter").value).toUpperCase();
+
+        return tasks.filter((task) => {
+          const matchesStatus = !status || task.status === status;
+
+          const haystack = [
+            task.sku_number,
+            task.product_name,
+            task.from_rack_name,
+            task.suggested_zone,
+            task.suggested_aisle,
+            task.status,
+          ]
+            .join(" ")
+            .toLowerCase();
+
+          return matchesStatus && (!query || haystack.includes(query));
+        });
+      }
+
+      function renderKpis() {
+        const summary = calculatorPayload?.summary || {};
+
+        const cards = [
+          {
+            label: "SKU PARAM",
+            value: summary.param_sku_count,
+            note: "SKU dengan Max PF valid",
+            tone: "",
+          },
+          {
+            label: "SKU Perlu Replenish",
+            value: summary.replenishment_sku_count,
+            note: "Target PF lebih besar dari stock PF",
+            tone: "warning",
+          },
+          {
+            label: "Task Kandidat",
+            value: summary.task_count,
+            note: "Sudah dikurangi task_key existing",
+            tone: "safe",
+          },
+          {
+            label: "Required Qty",
+            value: summary.required_qty,
+            note: "Total kebutuhan replenishment",
+            tone: "",
+          },
+          {
+            label: "Allocated Qty",
+            value: summary.allocated_qty,
+            note: "Qty yang tercover source storage",
+            tone: "safe",
+          },
+          {
+            label: "Shortage Qty",
+            value: summary.shortage_qty,
+            note: "Kebutuhan yang belum tercover",
+            tone: numberValue(summary.shortage_qty) > 0 ? "danger" : "safe",
+          },
+        ];
+
+        byId("kpiGrid").innerHTML = cards
+          .map(
+            (card) => `
+        <article class="kpi ${card.tone}">
+          <span>${escapeHtml(card.label)}</span>
+          <strong>${qty(card.value)}</strong>
+          <small>${escapeHtml(card.note)}</small>
+        </article>
+      `,
+          )
+          .join("");
+      }
+
+      function updateGenerateButton() {
+        const selectedCount = selectedTaskKeys.size;
+
+        byId("generateButton").disabled = loading || selectedCount === 0;
+        byId("generateButton").textContent = selectedCount
+          ? `Generate ${qty(selectedCount)} Task`
+          : "Generate Task Terpilih";
+      }
+
+      function renderTasks() {
+        const rows = visibleTasks();
+
+        byId("taskCount").textContent = `${qty(rows.length)} task`;
+
+        byId("helper").textContent = calculatorPayload
+          ? `${qty(calculatorPayload.summary?.task_count)} kandidat task · ` +
+            `${qty(calculatorPayload.summary?.skipped_existing_source_count)} source rack dilewati karena task_key sudah ada.`
+          : "Calculator belum dimuat.";
+
+        byId("taskBody").innerHTML = rows.length
+          ? rows
+              .map((task) => {
+                const checked = selectedTaskKeys.has(task.task_key);
+
+                const destination =
+                  task.suggested_rack_name ||
+                  [
+                    task.suggested_zone,
+                    task.suggested_aisle
+                      ? `Aisle ${String(task.suggested_aisle).padStart(2, "0")}`
+                      : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" · ") ||
+                  "Belum ada saran";
+
+                return `
+            <tr>
+              <td class="center">
+                <input
+                  class="task-checkbox"
+                  type="checkbox"
+                  data-task-key="${escapeHtml(task.task_key)}"
+                  ${checked ? "checked" : ""}
+                >
+              </td>
+
+              <td class="left sku-cell">
+                <strong>${escapeHtml(task.sku_number)}</strong>
+                <span>${escapeHtml(task.product_name || "Produk tanpa nama")}</span>
+              </td>
+
+              <td>${qty(task.doi)}</td>
+              <td>${qty(task.max_pf)}</td>
+              <td>${qty(task.target_pf)}</td>
+              <td>${qty(task.pickface_stock)}</td>
+              <td>${qty(task.replenish_qty)}</td>
+
+              <td class="left rack-cell">
+                ${escapeHtml(task.from_rack_name)}
+              </td>
+
+              <td>${qty(task.source_stock)}</td>
+              <td><strong>${qty(task.allocated_qty)}</strong></td>
+
+              <td class="left">
+                ${escapeHtml(destination)}
+                <br>
+                <span class="muted">
+                  ${escapeHtml(task.suggestion_basis || "")}
+                </span>
+              </td>
+
+              <td>${qty(task.shortage_qty)}</td>
+
+              <td>
+                <span class="status ${statusClass(task.status)}">
+                  ${escapeHtml(task.status.replaceAll("_", " "))}
+                </span>
+              </td>
+            </tr>
+          `;
+              })
+              .join("")
+          : `
+          <tr>
+            <td class="empty" colspan="13">
+              Tidak ada kandidat task pada filter ini.
+            </td>
+          </tr>
+        `;
+
+        const visibleKeys = rows.map((task) => task.task_key);
+        const allSelected =
+          visibleKeys.length > 0 &&
+          visibleKeys.every((key) => selectedTaskKeys.has(key));
+
+        byId("selectAll").checked = allSelected;
+        byId("selectAll").indeterminate =
+          !allSelected && visibleKeys.some((key) => selectedTaskKeys.has(key));
+
+        updateGenerateButton();
+      }
+
+      async function loadCalculator() {
+        const doi = numberValue(byId("doiInput").value);
+
+        if (doi <= 0) {
+          showMessage("DOI wajib lebih dari 0.", "error");
+          return;
+        }
+
+        loading = true;
+        clearMessage();
+        selectedTaskKeys.clear();
+
+        byId("calculateButton").disabled = true;
+        byId("refreshButton").disabled = true;
+        byId("freshness").textContent = "Menghitung replenishment…";
+        byId("taskBody").innerHTML = `
+        <tr>
+          <td class="empty" colspan="13">
+            Mengambil PARAM, SOH, dan task key existing…
+          </td>
+        </tr>
+      `;
+
+        updateGenerateButton();
+
+        try {
+          const url = new URL(API_URL, window.location.origin);
+          url.searchParams.set("doi", String(doi));
+          url.searchParams.set("_ts", String(Date.now()));
+
+          const response = await fetch(url, {
+            method: "GET",
+            cache: "no-store",
+            headers: {
+              accept: "application/json",
+            },
+          });
+
+          const payload = await response.json();
+
+          if (!response.ok || !payload?.ok) {
+            throw new Error(
+              payload?.message || `Calculator gagal: HTTP ${response.status}`,
+            );
+          }
+
+          calculatorPayload = payload;
+
+          renderKpis();
+          renderTasks();
+
+          byId("freshness").textContent =
+            `Live · ${formatSnapshot(payload.snapshot_at)}`;
+
+          showMessage(
+            `Kalkulasi selesai. ${qty(payload.summary?.task_count)} task kandidat siap direview.`,
+            "success",
+          );
+        } catch (error) {
+          calculatorPayload = null;
+
+          byId("kpiGrid").innerHTML = "";
+          byId("taskBody").innerHTML = `
+          <tr>
+            <td class="empty" colspan="13">
+              Calculator gagal dimuat: ${escapeHtml(error.message)}
+            </td>
+          </tr>
+        `;
+
+          byId("freshness").textContent = "Calculator gagal dimuat";
+          showMessage(error.message, "error");
+        } finally {
+          loading = false;
+          byId("calculateButton").disabled = false;
+          byId("refreshButton").disabled = false;
+          updateGenerateButton();
+        }
+      }
+
+      async function generateSelectedTasks() {
+        if (!calculatorPayload) return;
+
+        const tasks = calculatorPayload.tasks.filter((task) =>
+          selectedTaskKeys.has(task.task_key),
+        );
+
+        if (!tasks.length) {
+          showMessage("Belum ada task yang dipilih.", "error");
+          return;
+        }
+
+        const confirmed = window.confirm(
+          `Generate ${tasks.length} task ke Google Sheets?`,
+        );
+
+        if (!confirmed) return;
+
+        loading = true;
+        clearMessage();
+        updateGenerateButton();
+
+        byId("calculateButton").disabled = true;
+        byId("refreshButton").disabled = true;
+        byId("freshness").textContent = "Menyimpan task…";
+
+        try {
+          const response = await fetch(API_URL, {
+            method: "POST",
+            headers: {
+              accept: "application/json",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({ tasks }),
+          });
+
+          const payload = await response.json();
+
+          if (!response.ok || !payload?.ok) {
+            throw new Error(
+              payload?.message ||
+                `Generate task gagal: HTTP ${response.status}`,
+            );
+          }
+
+          selectedTaskKeys.clear();
+
+          showMessage(
+            `${qty(payload.inserted)} task berhasil dibuat. ` +
+              `${qty(payload.skipped)} task dilewati karena sudah pernah tergenerate.`,
+            "success",
+          );
+
+          await loadCalculator();
+        } catch (error) {
+          showMessage(error.message, "error");
+          byId("freshness").textContent = "Generate task gagal";
+        } finally {
+          loading = false;
+          byId("calculateButton").disabled = false;
+          byId("refreshButton").disabled = false;
+          updateGenerateButton();
+        }
+      }
+
+      byId("calculateButton").addEventListener("click", loadCalculator);
+      byId("refreshButton").addEventListener("click", loadCalculator);
+      byId("generateButton").addEventListener("click", generateSelectedTasks);
+
+      byId("searchInput").addEventListener("input", renderTasks);
+      byId("statusFilter").addEventListener("change", renderTasks);
+
+      byId("doiInput").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          loadCalculator();
+        }
+      });
+
+      byId("selectAll").addEventListener("change", (event) => {
+        for (const task of visibleTasks()) {
+          if (event.target.checked) {
+            selectedTaskKeys.add(task.task_key);
+          } else {
+            selectedTaskKeys.delete(task.task_key);
+          }
+        }
+
+        renderTasks();
+      });
+
+      byId("taskBody").addEventListener("change", (event) => {
+        const checkbox = event.target.closest(".task-checkbox");
+
+        if (!checkbox) return;
+
+        if (checkbox.checked) {
+          selectedTaskKeys.add(checkbox.dataset.taskKey);
+        } else {
+          selectedTaskKeys.delete(checkbox.dataset.taskKey);
+        }
+
+        renderTasks();
+      });
+
+      loadCalculator();
+    </script>
+  </body>
+</html>
