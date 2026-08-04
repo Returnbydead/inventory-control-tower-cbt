@@ -33,6 +33,9 @@
     },
     "api/sync-putaway.js": {
       "maxDuration": 300
+    },
+    "api/replenishment-calculator.js": {
+      "maxDuration": 60
     }
   }
 }
