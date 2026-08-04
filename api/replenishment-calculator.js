@@ -110,6 +110,12 @@ async function postTasksToGas(tasks) {
   return payload;
 }
 
+/**
+ * Mengambil parameter dari GAS.
+ *
+ * DOI tidak dibaca dari GSheet.
+ * DOI tetap berasal dari input web.
+ */
 function normalizeParamRows(rows) {
   const bySku = new Map();
 
@@ -146,6 +152,14 @@ function normalizeParamRows(rows) {
   return [...bySku.values()];
 }
 
+/**
+ * Mengelompokkan detail SOH MotherDuck per SKU.
+ *
+ * MotherDuck dipakai untuk menentukan:
+ * - Source rack
+ * - Stock per source rack
+ * - Destination Pickface
+ */
 function groupSohRows(rows) {
   const bySku = new Map();
 
@@ -167,13 +181,16 @@ function groupSohRows(rows) {
       product_id: clean(row.product_id),
       sku_number: skuNumber,
       product_name: clean(row.product_name),
+
       rack_name: normalizeRack(row.rack_name),
       zone: clean(row.zone).toUpperCase(),
       aisle: clean(row.aisle),
       rack_sequence: clean(row.rack_sequence),
       rack_level: clean(row.rack_level).toUpperCase(),
+
       remarks_zone: clean(row.remarks_zone).toUpperCase(),
       l1_category_name: clean(row.l1_category_name),
+
       stock: rounded(row.stock),
 
       snapshot_at: row.snapshot_at
@@ -234,6 +251,18 @@ function suggestionFor(group) {
   };
 }
 
+/**
+ * Logic utama:
+ *
+ * Final Qty = Max PF × DOI dari web
+ *
+ * Need Qty = MAX(0, Final Qty - Pickface)
+ *
+ * Task Qty = MIN(Storage, Need Qty)
+ *
+ * MotherDuck lalu membagi Task Qty tersebut
+ * ke source rack satu per satu.
+ */
 function buildCalculator({ params, sohRows, existingKeys, doi }) {
   const existingKeySet = new Set(
     (existingKeys || []).map(clean).filter(Boolean),
@@ -257,9 +286,9 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
       all: [],
     };
 
-    /*
-     * Tanpa detail SOH MotherDuck,
-     * source rack tidak bisa dibuat.
+    /**
+     * SKU tanpa detail SOH MotherDuck tidak bisa
+     * dibuatkan source rack.
      */
     if (!group.all.length) {
       skuRows.push({
@@ -271,8 +300,8 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
         max_pf: param.max_pf,
         target_pf: rounded(param.max_pf * doi),
 
-        pickface_stock: 0,
-        storage_stock: 0,
+        pickface_stock: rounded(param.pickface),
+        storage_stock: rounded(param.storage),
 
         need_qty: 0,
         replenish_qty: 0,
@@ -297,34 +326,32 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
         group.all.find((row) => row.product_name)?.product_name,
     );
 
-    /*
+    /**
      * DOI tetap berasal dari input web.
      */
     const targetPf = rounded(param.max_pf * doi);
 
-    /*
-     * Pickface dan Storage berasal dari sheet PARAM.
+    /**
+     * Pickface dan Storage berasal dari PARAM GSheet.
      */
     const pickfaceStock = rounded(param.pickface);
 
     const storageStock = rounded(param.storage);
 
-    /*
-     * Kebutuhan penuh:
-     *
-     * Final Qty - Pickface
+    /**
+     * Kekurangan Pickface sebelum dibatasi Storage.
      */
     const needQty = rounded(Math.max(0, targetPf - pickfaceStock));
 
-    /*
-     * Qty task:
+    /**
+     * Task Qty sesuai formula GSheet:
      *
-     * Tidak boleh melebihi Storage.
+     * MIN(Storage, Final Qty - Pickface)
      */
     const replenishQty = rounded(Math.min(storageStock, needQty));
 
-    /*
-     * Pickface sudah memenuhi target.
+    /**
+     * Pickface sudah mencukupi Final Qty.
      */
     if (needQty <= 0) {
       skuRows.push({
@@ -353,19 +380,18 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
       continue;
     }
 
-    /*
-     * Required Qty mengikuti Task Qty GSheet:
-     *
-     * MIN(Storage, Final Qty - Pickface)
+    /**
+     * Required Qty mengikuti total Task Qty GSheet.
      */
     totalRequiredQty += replenishQty;
 
-    /*
-     * Butuh replenishment tetapi Storage kosong.
+    /**
+     * Perlu replenishment tetapi Storage PARAM kosong.
+     *
+     * Karena Task Qty = 0, SKU ini tidak menambah
+     * Required Qty ataupun Shortage Qty.
      */
     if (replenishQty <= 0) {
-      totalShortageQty += needQty;
-
       skuRows.push({
         product_id: productId,
         sku_number: param.sku_number,
@@ -381,7 +407,7 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
         need_qty: needQty,
         replenish_qty: 0,
         allocated_qty: 0,
-        shortage_qty: needQty,
+        shortage_qty: 0,
 
         source_count: 0,
         task_count: 0,
@@ -394,13 +420,13 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
 
     const suggestion = suggestionFor(group);
 
-    /*
+    /**
      * Source rack:
      *
-     * - STORAGE
-     * - SRA1 / SRB1 / SRC1
+     * - remarks_zone STORAGE
+     * - Zone SRA1, SRB1, SRC1
      * - Level L2 sampai L6
-     * - Stock terkecil lebih dulu
+     * - Stock terkecil lebih dahulu
      */
     const eligibleSources = [...group.storage].sort(
       (left, right) =>
@@ -422,9 +448,9 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
 
       const taskKey = buildTaskKey(param.sku_number, source.rack_name);
 
-      /*
-       * Source rack yang sudah pernah dibuat task
-       * tidak boleh dibuat ulang.
+      /**
+       * SKU dan source rack yang sudah pernah
+       * dibuat task tidak dibuat ulang.
        */
       if (existingKeySet.has(taskKey)) {
         skippedExistingCount += 1;
@@ -475,16 +501,13 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
       taskCount += 1;
     }
 
-    /*
-     * Shortage dihitung dari kebutuhan penuh.
+    /**
+     * Shortage hanya dihitung dari Task Qty yang
+     * belum berhasil dipenuhi oleh source rack.
      *
-     * Contoh:
-     * Need 100
-     * Storage 60
-     * Allocated 60
-     * Shortage 40
+     * Required Qty = Allocated Qty + Shortage Qty.
      */
-    const shortageQty = rounded(Math.max(0, needQty - allocatedSkuQty));
+    const shortageQty = rounded(Math.max(0, replenishQty - allocatedSkuQty));
 
     const skuStatus =
       shortageQty > 0
