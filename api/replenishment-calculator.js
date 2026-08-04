@@ -67,6 +67,7 @@ async function parseJsonResponse(response, label) {
 
 async function fetchGasAction(action) {
   const url = new URL(gasUrl());
+
   url.searchParams.set("action", action);
   url.searchParams.set("_ts", String(Date.now()));
 
@@ -114,19 +115,31 @@ function normalizeParamRows(rows) {
 
   for (const row of rows || []) {
     const skuNumber = normalizeSku(row.sku_number);
-    const maxPf = number(row.max_pf);
+    const maxPf = rounded(row.max_pf);
 
-    if (!skuNumber || maxPf <= 0) continue;
+    if (!skuNumber || maxPf <= 0) {
+      continue;
+    }
+
+    const normalized = {
+      product_id: clean(row.product_id),
+      sku_number: skuNumber,
+      product_name: clean(row.product_name),
+
+      soh: rounded(row.soh),
+      pickface: rounded(row.pickface),
+      storage: rounded(row.storage),
+
+      order_per_day: rounded(row.order_per_day),
+      shelf_life: rounded(row.shelf_life),
+
+      max_pf: maxPf,
+    };
 
     const current = bySku.get(skuNumber);
 
-    if (!current || maxPf > current.max_pf) {
-      bySku.set(skuNumber, {
-        product_id: clean(row.product_id),
-        sku_number: skuNumber,
-        product_name: clean(row.product_name),
-        max_pf: rounded(maxPf),
-      });
+    if (!current || normalized.max_pf > current.max_pf) {
+      bySku.set(skuNumber, normalized);
     }
   }
 
@@ -139,7 +152,9 @@ function groupSohRows(rows) {
   for (const row of rows || []) {
     const skuNumber = normalizeSku(row.sku_number);
 
-    if (!skuNumber) continue;
+    if (!skuNumber) {
+      continue;
+    }
 
     const group = bySku.get(skuNumber) || {
       sku_number: skuNumber,
@@ -160,6 +175,7 @@ function groupSohRows(rows) {
       remarks_zone: clean(row.remarks_zone).toUpperCase(),
       l1_category_name: clean(row.l1_category_name),
       stock: rounded(row.stock),
+
       snapshot_at: row.snapshot_at
         ? new Date(row.snapshot_at).toISOString()
         : null,
@@ -209,8 +225,11 @@ function suggestionFor(group) {
 
   return {
     suggested_zone: clean(area?.zone),
+
     suggested_aisle: area?.aisle ? String(area.aisle).padStart(2, "0") : "",
+
     suggested_rack_name: "",
+
     suggestion_basis: area ? "PLANOGRAM_L1" : "NO_DESTINATION_SUGGESTION",
   };
 }
@@ -221,6 +240,7 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
   );
 
   const sohBySku = groupSohRows(sohRows);
+
   const candidates = [];
   const skuRows = [];
 
@@ -236,28 +256,38 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
       storage: [],
       all: [],
     };
-    // PARAM bisa berisi SKU yang sudah tidak memiliki stock di snapshot SOH.
-    // SKU tanpa baris SOH bukan kandidat replenishment dan tidak boleh
-    // menambah required qty maupun shortage qty.
+
+    /*
+     * Tanpa detail SOH MotherDuck,
+     * source rack tidak bisa dibuat.
+     */
     if (!group.all.length) {
       skuRows.push({
         product_id: clean(param.product_id),
         sku_number: param.sku_number,
         product_name: clean(param.product_name),
+
         doi: rounded(doi),
         max_pf: param.max_pf,
         target_pf: rounded(param.max_pf * doi),
+
         pickface_stock: 0,
+        storage_stock: 0,
+
+        need_qty: 0,
         replenish_qty: 0,
         allocated_qty: 0,
         shortage_qty: 0,
+
         source_count: 0,
         task_count: 0,
+
         status: "NO_SOH",
       });
 
       continue;
     }
+
     const productId = clean(
       param.product_id || group.all.find((row) => row.product_id)?.product_id,
     );
@@ -267,45 +297,118 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
         group.all.find((row) => row.product_name)?.product_name,
     );
 
+    /*
+     * DOI tetap berasal dari input web.
+     */
     const targetPf = rounded(param.max_pf * doi);
 
-    const pickfaceStock = rounded(
-      group.pickface.reduce((total, row) => total + row.stock, 0),
-    );
+    /*
+     * Pickface dan Storage berasal dari sheet PARAM.
+     */
+    const pickfaceStock = rounded(param.pickface);
 
-    const replenishQty = rounded(Math.max(0, targetPf - pickfaceStock));
+    const storageStock = rounded(param.storage);
 
-    if (replenishQty <= 0) {
+    /*
+     * Kebutuhan penuh:
+     *
+     * Final Qty - Pickface
+     */
+    const needQty = rounded(Math.max(0, targetPf - pickfaceStock));
+
+    /*
+     * Qty task:
+     *
+     * Tidak boleh melebihi Storage.
+     */
+    const replenishQty = rounded(Math.min(storageStock, needQty));
+
+    /*
+     * Pickface sudah memenuhi target.
+     */
+    if (needQty <= 0) {
       skuRows.push({
         product_id: productId,
         sku_number: param.sku_number,
         product_name: productName,
-        doi,
+
+        doi: rounded(doi),
         max_pf: param.max_pf,
         target_pf: targetPf,
+
         pickface_stock: pickfaceStock,
+        storage_stock: storageStock,
+
+        need_qty: 0,
         replenish_qty: 0,
         allocated_qty: 0,
         shortage_qty: 0,
+
         source_count: 0,
         task_count: 0,
+
         status: "NO_REPLENISHMENT",
       });
 
       continue;
     }
 
+    /*
+     * Required Qty mengikuti Task Qty GSheet:
+     *
+     * MIN(Storage, Final Qty - Pickface)
+     */
     totalRequiredQty += replenishQty;
+
+    /*
+     * Butuh replenishment tetapi Storage kosong.
+     */
+    if (replenishQty <= 0) {
+      totalShortageQty += needQty;
+
+      skuRows.push({
+        product_id: productId,
+        sku_number: param.sku_number,
+        product_name: productName,
+
+        doi: rounded(doi),
+        max_pf: param.max_pf,
+        target_pf: targetPf,
+
+        pickface_stock: pickfaceStock,
+        storage_stock: storageStock,
+
+        need_qty: needQty,
+        replenish_qty: 0,
+        allocated_qty: 0,
+        shortage_qty: needQty,
+
+        source_count: 0,
+        task_count: 0,
+
+        status: "STOCK_NOT_ENOUGH",
+      });
+
+      continue;
+    }
 
     const suggestion = suggestionFor(group);
 
+    /*
+     * Source rack:
+     *
+     * - STORAGE
+     * - SRA1 / SRB1 / SRC1
+     * - Level L2 sampai L6
+     * - Stock terkecil lebih dulu
+     */
     const eligibleSources = [...group.storage].sort(
       (left, right) =>
         left.stock - right.stock ||
         left.rack_name.localeCompare(right.rack_name),
     );
 
-    let remainingQty = replenishQty;
+    let remainingTaskQty = replenishQty;
     let allocatedSkuQty = 0;
     let sourceCount = 0;
     let taskCount = 0;
@@ -313,47 +416,76 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
     const pendingTasks = [];
 
     for (const source of eligibleSources) {
-      if (remainingQty <= 0) break;
+      if (remainingTaskQty <= 0) {
+        break;
+      }
 
       const taskKey = buildTaskKey(param.sku_number, source.rack_name);
 
+      /*
+       * Source rack yang sudah pernah dibuat task
+       * tidak boleh dibuat ulang.
+       */
       if (existingKeySet.has(taskKey)) {
         skippedExistingCount += 1;
         continue;
       }
 
-      const allocatedQty = rounded(Math.min(source.stock, remainingQty));
+      const allocatedQty = rounded(Math.min(source.stock, remainingTaskQty));
 
-      if (allocatedQty <= 0) continue;
+      if (allocatedQty <= 0) {
+        continue;
+      }
 
       pendingTasks.push({
         task_key: taskKey,
+
         product_id: productId,
         sku_number: param.sku_number,
         product_name: productName,
+
         doi: rounded(doi),
         max_pf: param.max_pf,
         target_pf: targetPf,
+
         pickface_stock: pickfaceStock,
+        storage_stock: storageStock,
+
+        need_qty: needQty,
         replenish_qty: replenishQty,
+
         from_rack_name: source.rack_name,
         source_stock: source.stock,
         allocated_qty: allocatedQty,
+
         suggested_zone: suggestion.suggested_zone,
         suggested_aisle: suggestion.suggested_aisle,
         suggested_rack_name: suggestion.suggested_rack_name,
+
         suggestion_basis: suggestion.suggestion_basis,
+
         status: "READY",
       });
 
-      remainingQty = rounded(remainingQty - allocatedQty);
+      remainingTaskQty = rounded(remainingTaskQty - allocatedQty);
+
       allocatedSkuQty = rounded(allocatedSkuQty + allocatedQty);
 
       sourceCount += 1;
       taskCount += 1;
     }
 
-    const shortageQty = rounded(Math.max(0, remainingQty));
+    /*
+     * Shortage dihitung dari kebutuhan penuh.
+     *
+     * Contoh:
+     * Need 100
+     * Storage 60
+     * Allocated 60
+     * Shortage 40
+     */
+    const shortageQty = rounded(Math.max(0, needQty - allocatedSkuQty));
+
     const skuStatus =
       shortageQty > 0
         ? allocatedSkuQty > 0
@@ -376,24 +508,35 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
       product_id: productId,
       sku_number: param.sku_number,
       product_name: productName,
+
       doi: rounded(doi),
       max_pf: param.max_pf,
       target_pf: targetPf,
+
       pickface_stock: pickfaceStock,
+      storage_stock: storageStock,
+
+      need_qty: needQty,
       replenish_qty: replenishQty,
       allocated_qty: allocatedSkuQty,
       shortage_qty: shortageQty,
+
       source_count: sourceCount,
       task_count: taskCount,
+
       status: skuStatus,
+
       ...suggestion,
     });
   }
 
   const snapshotAt = sohRows.reduce((latest, row) => {
-    if (!row.snapshot_at) return latest;
+    if (!row.snapshot_at) {
+      return latest;
+    }
 
     const value = new Date(row.snapshot_at).toISOString();
+
     return !latest || value > latest ? value : latest;
   }, null);
 
@@ -401,6 +544,7 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
     ok: true,
     doi: rounded(doi),
     snapshot_at: snapshotAt,
+
     summary: {
       param_sku_count: params.length,
 
@@ -410,7 +554,7 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
         .length,
 
       replenishment_sku_count: skuRows.filter(
-        (row) => row.status !== "NO_SOH" && row.replenish_qty > 0,
+        (row) => row.status !== "NO_SOH" && row.need_qty > 0,
       ).length,
 
       task_sku_count: new Set(candidates.map((task) => task.sku_number)).size,
@@ -425,12 +569,18 @@ function buildCalculator({ params, sohRows, existingKeys, doi }) {
       ).length,
 
       task_count: candidates.length,
+
       required_qty: rounded(totalRequiredQty),
+
       allocated_qty: rounded(totalAllocatedQty),
+
       shortage_qty: rounded(totalShortageQty),
+
       skipped_existing_source_count: skippedExistingCount,
+
       existing_task_key_count: existingKeySet.size,
     },
+
     sku_rows: skuRows,
     tasks: candidates,
   };
@@ -447,6 +597,7 @@ async function loadSohRows(params) {
 
   try {
     client = await getPool().connect();
+
     await client.query(`USE ${databaseName()}`);
 
     const result = await client.query(
@@ -507,7 +658,9 @@ function normalizePostedTasks(tasks) {
 
   return tasks.map((task) => {
     const skuNumber = normalizeSku(task.sku_number);
+
     const fromRackName = normalizeRack(task.from_rack_name);
+
     const allocatedQty = rounded(task.allocated_qty);
 
     if (!skuNumber || !fromRackName) {
@@ -524,16 +677,25 @@ function normalizePostedTasks(tasks) {
       product_id: clean(task.product_id),
       sku_number: skuNumber,
       product_name: clean(task.product_name),
+
       doi: rounded(task.doi),
       max_pf: rounded(task.max_pf),
       target_pf: rounded(task.target_pf),
+
       pickface_stock: rounded(task.pickface_stock),
+
       replenish_qty: rounded(task.replenish_qty),
+
       from_rack_name: fromRackName,
+
       source_stock: rounded(task.source_stock),
+
       allocated_qty: allocatedQty,
+
       suggested_zone: clean(task.suggested_zone),
+
       suggested_aisle: clean(task.suggested_aisle),
+
       status: clean(task.status) || "GENERATED",
     };
   });
@@ -542,7 +704,7 @@ function normalizePostedTasks(tasks) {
 async function handleGet(req, res) {
   const doi = number(req.query.doi || 1);
 
-  if (!Number.isFinite(doi) || doi <= 0) {
+  if (doi <= 0) {
     return json(res, 400, {
       ok: false,
       message: "DOI wajib berupa angka lebih dari 0.",
@@ -555,6 +717,7 @@ async function handleGet(req, res) {
   ]);
 
   const params = normalizeParamRows(paramPayload.rows);
+
   const sohRows = await loadSohRows(params);
 
   return json(
@@ -571,12 +734,16 @@ async function handleGet(req, res) {
 
 async function handlePost(req, res) {
   const tasks = normalizePostedTasks(req.body?.tasks);
+
   const result = await postTasksToGas(tasks);
 
   return json(res, 200, {
     ok: true,
+
     inserted: number(result.inserted),
+
     skipped: number(result.skipped),
+
     skipped_rows: Array.isArray(result.skipped_rows) ? result.skipped_rows : [],
   });
 }
@@ -605,6 +772,7 @@ module.exports = async function handler(req, res) {
 
     return json(res, 500, {
       ok: false,
+
       message: error.message || "Replenishment calculator gagal.",
     });
   }
