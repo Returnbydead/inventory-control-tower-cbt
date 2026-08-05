@@ -33,6 +33,13 @@ function csvValue(value) {
   return `"${String(value ?? "").replaceAll('"', '""')}"`;
 }
 
+function buildCsv(rows, { delimiter = ",", excelSeparator = false } = {}) {
+  const separatorHint = excelSeparator ? `sep=${delimiter}\r\n` : "";
+  return `\uFEFF${separatorHint}${rows
+    .map((row) => row.map(csvValue).join(delimiter))
+    .join("\r\n")}`;
+}
+
 function selectedZones(value) {
   const requested = clean(value || ALL_ZONES).toUpperCase()
     .split(",").map((item) => item.trim()).filter(Boolean);
@@ -78,10 +85,10 @@ function planogramExportRow(row) {
     .slice(0, 4)
     .map((item) => clean(item.label))
     .filter(Boolean)
-    .join("\n");
+    .join(" | ");
 
   return [
-    [clean(row.sku_number), clean(row.product_name)].filter(Boolean).join("\n"),
+    [clean(row.sku_number), clean(row.product_name)].filter(Boolean).join(" - "),
     row.rack_name,
     row.zone,
     row.aisle,
@@ -148,8 +155,12 @@ module.exports = async function handler(req, res) {
         query: req.query.q,
       }).map((row) => planogramExportRow(row))
       : rows.map((row) => exportRow(row, scope, snapshot, planogram.rules));
-    const csv = `\uFEFF${[...(planogramDetail ? planogramHeaders : headers), ...csvRows]
-      .map((row) => row.map(csvValue).join(",")).join("\r\n")}`;
+    const csv = buildCsv(
+      [...(planogramDetail ? planogramHeaders : headers), ...csvRows],
+      planogramDetail
+        ? { delimiter: ";", excelSeparator: true }
+        : { delimiter: "," },
+    );
     const suffix = clean(req.query.table || "raw").replace(/[^a-z0-9_-]/gi, "-");
     const snapshotStamp = snapshot ? snapshot.replace(/[:.]/g, "-").slice(0, 19) : "snapshot";
     res.setHeader("Cache-Control", "no-store");
@@ -166,6 +177,7 @@ module.exports = async function handler(req, res) {
 
 module.exports._test = {
   exportRow,
+  buildCsv,
   l1Status,
   PLANOGRAM_EXPORT_HEADERS,
   planogramExportRow,

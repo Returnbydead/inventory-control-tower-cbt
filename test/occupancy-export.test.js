@@ -2,6 +2,7 @@ const test = require("node:test");
 const assert = require("node:assert/strict");
 const {
   exportRow,
+  buildCsv,
   PLANOGRAM_EXPORT_HEADERS,
   planogramExportRow,
   selectedZones,
@@ -62,15 +63,27 @@ test("planogram detail export mirrors the simple table without values or suggest
     "Saran Placement", "Status",
   ]);
   assert.equal(row.length, PLANOGRAM_EXPORT_HEADERS.length);
-  assert.equal(row[0], "899000000002\nCokelat Test");
+  assert.equal(row[0], "899000000002 - Cokelat Test");
   assert.equal(row[7], 24);
   assert.equal(row[8], 24);
   assert.equal(row[9], "Minuman");
-  assert.equal(row[10], "SRA1 - aisle 12\nMZC2 - aisle 10");
+  assert.equal(row[10], "SRA1 - aisle 12 | MZC2 - aisle 10");
   assert.equal(row[11], "WRONG_L1");
   assert.ok(!row.includes(100000));
   assert.ok(!row.join(" ").includes("Teman SKU"));
   assert.ok(!row.join(" ").includes("Cluster L1"));
+});
+
+test("planogram CSV opens in regional Excel with separate columns and one row per record", () => {
+  const csv = buildCsv([
+    PLANOGRAM_EXPORT_HEADERS,
+    ["899 - Produk", "CBT-SRA1-01-01-L1-01", "SRA1"],
+  ], { delimiter: ";", excelSeparator: true });
+
+  assert.ok(csv.startsWith("\uFEFFsep=;\r\n"));
+  assert.match(csv, /"SKU \/ Produk";"Current Rack";"Zone"/);
+  assert.match(csv, /\r\n"899 - Produk";"CBT-SRA1-01-01-L1-01";"SRA1"$/);
+  assert.equal(csv.split("\r\n").length, 3);
 });
 
 test("occupancy export recognises every excluded non-storage location", () => {
