@@ -167,3 +167,21 @@ test("UI sends task keys and no longer exposes an ignored DOI control", () => {
   assert.match(html, /task_keys:\s*tasks\.map/);
   assert.match(html, /Task Qty resmi dari PARAM/);
 });
+
+test("UI renders replenishment quantities as whole Indonesian numbers", () => {
+  const html = fs.readFileSync(
+    path.join(__dirname, "..", "public", "preview", "replenishment-calculator.html"),
+    "utf8",
+  );
+
+  assert.match(
+    html,
+    /new Intl\.NumberFormat\("id-ID", \{\s*maximumFractionDigits: 0,/,
+  );
+  assert.equal(
+    new Intl.NumberFormat("id-ID", { maximumFractionDigits: 0 }).format(
+      46061.709,
+    ),
+    "46.062",
+  );
+});
