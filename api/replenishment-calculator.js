@@ -2,7 +2,7 @@ const { databaseName, getPool } = require("./sync-soh")._internal;
 const { placementAreasForCategory } = require("../lib/l1-placement");
 
 const SOURCE_ZONES = new Set(["SRA1", "SRB1", "SRC1"]);
-const SOURCE_LEVELS = new Set(["L2", "L3", "L4", "L5", "L6"]);
+const SOURCE_LEVELS = new Set(["L2", "L3", "L4", "L5", "L6", "L7"]);
 const MAX_POST_TASKS = 1000;
 
 function generationEnabled() {
@@ -549,7 +549,7 @@ function buildCalculator({
      *
      * - remarks_zone STORAGE
      * - Zone SRA1 / SRB1 / SRC1
-     * - Level L2 sampai L6
+     * - Level L2 sampai L7
      * - Stock terkecil lebih dahulu
      */
     const eligibleSources = [...group.storage].sort(

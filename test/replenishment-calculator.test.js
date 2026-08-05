@@ -69,6 +69,24 @@ test("uses GSheet Task Qty and allocates the smallest source rack first", () => 
   );
 });
 
+test("accepts replenishment source racks through level L7", () => {
+  const result = buildCalculator({
+    params: [param()],
+    sohRows: [
+      storage("RACK-L7", 5, { rack_level: "L7" }),
+      storage("RACK-L8", 10, { rack_level: "L8" }),
+    ],
+    existingKeys: [],
+  });
+
+  assert.deepEqual(
+    result.tasks.map((task) => [task.from_rack_name, task.allocated_qty]),
+    [["RACK-L7", 5]],
+  );
+  assert.equal(result.summary.allocated_qty, 5);
+  assert.equal(result.summary.shortage_qty, 3);
+});
+
 test("normalizes existing task keys and emits one candidate per source rack", () => {
   const result = buildCalculator({
     params: [param()],
