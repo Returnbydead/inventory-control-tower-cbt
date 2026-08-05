@@ -18,6 +18,22 @@ function rounded(value) {
   return Math.round(number(value) * 1000) / 1000;
 }
 
+function normalizeDoiOverride(value) {
+  if (value === undefined || value === null || clean(value) === "") {
+    return null;
+  }
+
+  const doi = number(value);
+
+  if (doi <= 0) {
+    const error = new Error("DOI override wajib berupa angka lebih dari 0.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return rounded(doi);
+}
+
 function normalizeSku(value) {
   return clean(value);
 }
@@ -266,13 +282,34 @@ function suggestionFor(group) {
   };
 }
 
+function calculationForParam(param, doiOverride) {
+  if (doiOverride === null) {
+    return {
+      doi: rounded(param.doi),
+      targetPf: rounded(param.final_qty),
+      needQty: rounded(Math.max(0, param.task_qty)),
+      taskQty: rounded(Math.max(0, param.task_qty)),
+    };
+  }
+
+  const targetPf = rounded(Math.max(0, param.max_pf) * doiOverride);
+  const needQty = rounded(Math.max(0, targetPf - param.pickface));
+  const taskQty = rounded(Math.min(Math.max(0, param.storage), needQty));
+
+  return {
+    doi: doiOverride,
+    targetPf,
+    needQty,
+    taskQty,
+  };
+}
+
 /**
- * Web tidak menghitung kebutuhan replenishment.
- *
- * replenishQty langsung mengambil Task Qty GSheet.
- * Web hanya membagi Task Qty ke source rack MotherDuck.
+ * Tanpa override, Task Qty final berasal dari GSheet.
+ * Dengan override, server menghitung ulang Target PF, Need, dan Task Qty.
+ * MotherDuck tetap hanya membagi Task Qty ke source rack.
  */
-function buildCalculator({ params, sohRows, existingKeys }) {
+function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) {
   const existingKeySet = new Set(
     (existingKeys || []).map(normalizeTaskKey).filter(Boolean),
   );
@@ -288,7 +325,8 @@ function buildCalculator({ params, sohRows, existingKeys }) {
   let skippedExistingCount = 0;
 
   for (const param of params) {
-    const taskQty = rounded(Math.max(0, param.task_qty));
+    const calculation = calculationForParam(param, doiOverride);
+    const { doi, targetPf, needQty, taskQty } = calculation;
 
     /**
      * Tidak ada Task Qty dari GSheet.
@@ -299,9 +337,9 @@ function buildCalculator({ params, sohRows, existingKeys }) {
         sku_number: param.sku_number,
         product_name: param.product_name,
 
-        doi: param.doi,
+        doi,
         max_pf: param.max_pf,
-        target_pf: param.final_qty,
+        target_pf: targetPf,
 
         pickface_stock: param.pickface,
         storage_stock: param.storage,
@@ -343,14 +381,14 @@ function buildCalculator({ params, sohRows, existingKeys }) {
         sku_number: param.sku_number,
         product_name: param.product_name,
 
-        doi: param.doi,
+        doi,
         max_pf: param.max_pf,
-        target_pf: param.final_qty,
+        target_pf: targetPf,
 
         pickface_stock: param.pickface,
         storage_stock: param.storage,
 
-        need_qty: taskQty,
+        need_qty: needQty,
         replenish_qty: taskQty,
         task_qty: taskQty,
 
@@ -434,14 +472,14 @@ function buildCalculator({ params, sohRows, existingKeys }) {
         sku_number: param.sku_number,
         product_name: productName,
 
-        doi: param.doi,
+        doi,
         max_pf: param.max_pf,
-        target_pf: param.final_qty,
+        target_pf: targetPf,
 
         pickface_stock: param.pickface,
         storage_stock: param.storage,
 
-        need_qty: taskQty,
+        need_qty: needQty,
         replenish_qty: taskQty,
         task_qty: taskQty,
 
@@ -491,14 +529,14 @@ function buildCalculator({ params, sohRows, existingKeys }) {
       sku_number: param.sku_number,
       product_name: productName,
 
-      doi: param.doi,
+      doi,
       max_pf: param.max_pf,
-      target_pf: param.final_qty,
+      target_pf: targetPf,
 
       pickface_stock: param.pickface,
       storage_stock: param.storage,
 
-      need_qty: taskQty,
+      need_qty: needQty,
       replenish_qty: taskQty,
       task_qty: taskQty,
 
@@ -534,8 +572,9 @@ function buildCalculator({ params, sohRows, existingKeys }) {
      * Dipertahankan agar frontend lama tidak error.
      * Nilainya berasal dari GSheet.
      */
-    doi: sheetDoi,
-    doi_source: "GSHEET",
+    doi: doiOverride ?? sheetDoi,
+    doi_source: doiOverride === null ? "GSHEET" : "WEB_OVERRIDE",
+    doi_override: doiOverride,
 
     snapshot_at: snapshotAt,
 
@@ -565,7 +604,7 @@ function buildCalculator({ params, sohRows, existingKeys }) {
       task_count: candidates.length,
 
       /**
-       * Total Task Qty langsung dari GSheet.
+       * Total Task Qty dari GSheet atau hasil DOI override.
        */
       required_qty: rounded(totalRequiredQty),
 
@@ -593,11 +632,11 @@ function buildCalculator({ params, sohRows, existingKeys }) {
  * MotherDuck hanya diambil untuk SKU
  * yang Task Qty GSheet lebih dari 0.
  */
-async function loadSohRows(params) {
+async function loadSohRows(params, doiOverride = null) {
   const skuNumbers = [
     ...new Set(
       params
-        .filter((row) => rounded(row.task_qty) > 0)
+        .filter((row) => calculationForParam(row, doiOverride).taskQty > 0)
         .map((row) => row.sku_number)
         .filter(Boolean),
     ),
@@ -806,28 +845,26 @@ function selectCurrentTasks(tasks, selectedKeys) {
   return selectedTasks;
 }
 
-async function loadCalculatorInputs() {
+async function loadCalculatorInputs(doiOverride = null) {
   const [paramPayload, keyPayload] = await Promise.all([
     fetchGasAction("param"),
     fetchGasAction("keys"),
   ]);
 
   const params = normalizeParamRows(paramPayload.rows);
-  const sohRows = await loadSohRows(params);
+  const sohRows = await loadSohRows(params, doiOverride);
 
   return {
     params,
     sohRows,
     existingKeys: keyPayload.keys,
+    doiOverride,
   };
 }
 
 async function handleGet(req, res) {
-  /**
-   * Query DOI dari frontend lama diabaikan.
-   * DOI resmi berasal dari GSheet.
-   */
-  const inputs = await loadCalculatorInputs();
+  const doiOverride = normalizeDoiOverride(req.query?.doi);
+  const inputs = await loadCalculatorInputs(doiOverride);
 
   return json(
     res,
@@ -838,7 +875,8 @@ async function handleGet(req, res) {
 
 async function handlePost(req, res) {
   const selectedKeys = normalizeSelectedTaskKeys(req.body?.task_keys);
-  const calculator = buildCalculator(await loadCalculatorInputs());
+  const doiOverride = normalizeDoiOverride(req.body?.doi_override);
+  const calculator = buildCalculator(await loadCalculatorInputs(doiOverride));
   const currentTasks = selectCurrentTasks(calculator.tasks, selectedKeys);
   const tasks = normalizePostedTasks(currentTasks);
 
@@ -888,7 +926,9 @@ module.exports = async function handler(req, res) {
 module.exports._test = {
   buildCalculator,
   buildTaskKey,
+  calculationForParam,
   groupSohRows,
+  normalizeDoiOverride,
   normalizeParamRows,
   normalizePostedTasks,
   normalizeSelectedTaskKeys,

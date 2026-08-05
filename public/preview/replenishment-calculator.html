@@ -329,6 +329,8 @@
         grid-template-columns:
           minmax(15rem, 1fr)
           minmax(12rem, 0.7fr)
+          minmax(8rem, 0.4fr)
+          auto
           auto
           auto;
         align-items: end;
@@ -721,7 +723,7 @@
         <section class="section">
           <header class="section-heading">
             <h1>Generate Replenishment Task</h1>
-            <span>Task Qty resmi dari PARAM, dibagi ke live source rack</span>
+            <span>Gunakan DOI PARAM atau override untuk simulasi task</span>
           </header>
 
           <div class="section-body">
@@ -747,7 +749,20 @@
                 </select>
               </div>
 
+              <div class="field">
+                <label for="doiInput">DOI override</label>
+                <input
+                  id="doiInput"
+                  type="number"
+                  min="0.1"
+                  step="0.1"
+                  placeholder="Ikuti GSheet"
+                />
+              </div>
+
               <button id="calculateButton" type="button">Hitung Ulang</button>
+
+              <button id="resetDoiButton" type="button">Reset DOI</button>
 
               <button
                 id="generateButton"
@@ -768,7 +783,7 @@
         <section class="section">
           <header class="section-heading">
             <h2>Ringkasan Kalkulasi</h2>
-            <span>DOI dari PARAM dan snapshot SOH terbaru</span>
+            <span id="calculationBasis">DOI dari PARAM dan snapshot SOH terbaru</span>
           </header>
 
           <div id="kpiGrid" class="kpi-grid"></div>
@@ -842,6 +857,20 @@
       };
 
       const qty = (value) => integerFormat.format(numberValue(value));
+
+      function doiOverrideValue() {
+        const raw = clean(byId("doiInput").value);
+
+        if (!raw) return null;
+
+        const doi = numberValue(raw);
+
+        if (doi <= 0) {
+          throw new Error("DOI override wajib lebih dari 0.");
+        }
+
+        return doi;
+      }
 
       const escapeHtml = (value) =>
         clean(value)
@@ -1078,12 +1107,22 @@
       }
 
       async function loadCalculator() {
+        let doiOverride;
+
+        try {
+          doiOverride = doiOverrideValue();
+        } catch (error) {
+          showMessage(error.message, "error");
+          return;
+        }
+
         loading = true;
         clearMessage();
         selectedTaskKeys.clear();
 
         byId("calculateButton").disabled = true;
         byId("refreshButton").disabled = true;
+        byId("resetDoiButton").disabled = true;
         byId("freshness").textContent = "Menghitung replenishment…";
         byId("taskBody").innerHTML = `
         <tr>
@@ -1097,6 +1136,11 @@
 
         try {
           const url = new URL(API_URL, window.location.origin);
+
+          if (doiOverride !== null) {
+            url.searchParams.set("doi", String(doiOverride));
+          }
+
           url.searchParams.set("_ts", String(Date.now()));
 
           const response = await fetch(url, {
@@ -1116,6 +1160,20 @@
           }
 
           calculatorPayload = payload;
+
+          const overrideActive = payload.doi_source === "WEB_OVERRIDE";
+
+          if (overrideActive) {
+            byId("doiInput").value = String(payload.doi_override);
+          }
+
+          byId("calculationBasis").textContent = overrideActive
+            ? `DOI override ${payload.doi} · snapshot SOH terbaru`
+            : "DOI dari PARAM dan snapshot SOH terbaru";
+
+          if (!overrideActive && payload.doi > 0) {
+            byId("doiInput").placeholder = `Ikuti GSheet (contoh ${payload.doi})`;
+          }
 
           renderKpis();
           renderTasks();
@@ -1145,12 +1203,35 @@
           loading = false;
           byId("calculateButton").disabled = false;
           byId("refreshButton").disabled = false;
+          byId("resetDoiButton").disabled = false;
           updateGenerateButton();
         }
       }
 
       async function generateSelectedTasks() {
         if (!calculatorPayload) return;
+
+        let currentDoiOverride;
+
+        try {
+          currentDoiOverride = doiOverrideValue();
+        } catch (error) {
+          showMessage(error.message, "error");
+          return;
+        }
+
+        const loadedDoiOverride =
+          calculatorPayload.doi_source === "WEB_OVERRIDE"
+            ? numberValue(calculatorPayload.doi_override)
+            : null;
+
+        if (currentDoiOverride !== loadedDoiOverride) {
+          showMessage(
+            "DOI sudah berubah. Klik Hitung Ulang sebelum Generate task.",
+            "error",
+          );
+          return;
+        }
 
         const tasks = calculatorPayload.tasks.filter((task) =>
           selectedTaskKeys.has(task.task_key),
@@ -1184,6 +1265,7 @@
             },
             body: JSON.stringify({
               task_keys: tasks.map((task) => task.task_key),
+              doi_override: loadedDoiOverride,
             }),
           });
 
@@ -1219,9 +1301,19 @@
       byId("calculateButton").addEventListener("click", loadCalculator);
       byId("refreshButton").addEventListener("click", loadCalculator);
       byId("generateButton").addEventListener("click", generateSelectedTasks);
+      byId("resetDoiButton").addEventListener("click", () => {
+        byId("doiInput").value = "";
+        loadCalculator();
+      });
 
       byId("searchInput").addEventListener("input", renderTasks);
       byId("statusFilter").addEventListener("change", renderTasks);
+
+      byId("doiInput").addEventListener("keydown", (event) => {
+        if (event.key === "Enter") {
+          loadCalculator();
+        }
+      });
 
       byId("selectAll").addEventListener("change", (event) => {
         for (const task of visibleTasks()) {

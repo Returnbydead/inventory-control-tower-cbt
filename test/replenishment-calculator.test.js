@@ -5,6 +5,8 @@ const path = require("node:path");
 
 const {
   buildCalculator,
+  calculationForParam,
+  normalizeDoiOverride,
   normalizePostedTasks,
   normalizeSelectedTaskKeys,
   normalizeTaskKey,
@@ -55,6 +57,7 @@ test("uses GSheet Task Qty and allocates the smallest source rack first", () => 
   });
 
   assert.equal(result.summary.required_qty, 8);
+  assert.equal(result.doi_source, "GSHEET");
   assert.deepEqual(
     result.tasks.map((task) => [task.from_rack_name, task.allocated_qty]),
     [
@@ -157,15 +160,52 @@ test("selected allocations cannot exceed the latest Task Qty per SKU", () => {
   );
 });
 
-test("UI sends task keys and no longer exposes an ignored DOI control", () => {
+test("UI sends task keys with the active DOI override", () => {
   const html = fs.readFileSync(
     path.join(__dirname, "..", "public", "preview", "replenishment-calculator.html"),
     "utf8",
   );
 
-  assert.doesNotMatch(html, /id="doiInput"/);
+  assert.match(html, /id="doiInput"/);
+  assert.match(html, /id="resetDoiButton"/);
+  assert.match(html, /url\.searchParams\.set\("doi"/);
   assert.match(html, /task_keys:\s*tasks\.map/);
-  assert.match(html, /Task Qty resmi dari PARAM/);
+  assert.match(html, /doi_override: loadedDoiOverride/);
+  assert.match(html, /Gunakan DOI PARAM atau override/);
+});
+
+test("DOI override recalculates Target PF, Need, and Task Qty on the server", () => {
+  const result = buildCalculator({
+    params: [param()],
+    sohRows: [storage("RACK-A", 5), storage("RACK-B", 30)],
+    existingKeys: [],
+    doiOverride: 3,
+  });
+
+  assert.equal(result.doi, 3);
+  assert.equal(result.doi_source, "WEB_OVERRIDE");
+  assert.equal(result.summary.required_qty, 28);
+  assert.equal(result.sku_rows[0].target_pf, 30);
+  assert.equal(result.sku_rows[0].need_qty, 28);
+  assert.equal(result.sku_rows[0].task_qty, 28);
+  assert.deepEqual(
+    result.tasks.map((task) => task.allocated_qty),
+    [5, 23],
+  );
+});
+
+test("DOI override caps Task Qty at GSheet Storage and rejects invalid DOI", () => {
+  const calculation = calculationForParam(param({ storage: 7 }), 3);
+
+  assert.deepEqual(calculation, {
+    doi: 3,
+    targetPf: 30,
+    needQty: 28,
+    taskQty: 7,
+  });
+  assert.equal(normalizeDoiOverride("2.5"), 2.5);
+  assert.equal(normalizeDoiOverride(""), null);
+  assert.throws(() => normalizeDoiOverride(0), /lebih dari 0/);
 });
 
 test("UI renders replenishment quantities as whole Indonesian numbers", () => {
