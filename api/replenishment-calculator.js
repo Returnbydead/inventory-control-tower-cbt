@@ -1000,7 +1000,7 @@ function selectCurrentTasks(tasks, selectedKeys) {
 }
 
 async function loadCalculatorInputs(doiOverride = null) {
-  const [paramPayload, ledgerPayload, planogramPayload] = await Promise.all([
+  const [paramPayload, ledgerPayload] = await Promise.all([
     fetchGasAction("param"),
     fetchGasAction("tasks")
       .then((payload) => {
@@ -1023,8 +1023,11 @@ async function loadCalculatorInputs(doiOverride = null) {
           ledgerMode: "KEYS_ONLY",
         };
       }),
-    fetchLivePlanogramRules(),
   ]);
+  // Apps Script can close one of several simultaneous executions. Keep the
+  // operational PARAM + ledger pair unchanged, then read Planogram after the
+  // ledger has been reconciled so a mapping refresh cannot downgrade safety.
+  const planogramPayload = await fetchLivePlanogramRules();
 
   const params = normalizeParamRows(paramPayload.rows);
   const sohRows = await loadSohRows(params, doiOverride);
