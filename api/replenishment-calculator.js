@@ -5,6 +5,10 @@ const SOURCE_ZONES = new Set(["SRA1", "SRB1", "SRC1"]);
 const SOURCE_LEVELS = new Set(["L2", "L3", "L4", "L5", "L6"]);
 const MAX_POST_TASKS = 1000;
 
+function generationEnabled() {
+  return clean(process.env.REPLENISHMENT_GENERATION_ENABLED).toLowerCase() === "true";
+}
+
 function clean(value) {
   return String(value ?? "").trim();
 }
@@ -567,6 +571,7 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
 
   return {
     ok: true,
+    generation_enabled: generationEnabled(),
 
     /**
      * Dipertahankan agar frontend lama tidak error.
@@ -874,6 +879,14 @@ async function handleGet(req, res) {
 }
 
 async function handlePost(req, res) {
+  if (!generationEnabled()) {
+    const error = new Error(
+      "Generate task dikunci sementara untuk mencegah task duplikat.",
+    );
+    error.statusCode = 423;
+    throw error;
+  }
+
   const selectedKeys = normalizeSelectedTaskKeys(req.body?.task_keys);
   const doiOverride = normalizeDoiOverride(req.body?.doi_override);
   const calculator = buildCalculator(await loadCalculatorInputs(doiOverride));
@@ -927,6 +940,7 @@ module.exports._test = {
   buildCalculator,
   buildTaskKey,
   calculationForParam,
+  generationEnabled,
   groupSohRows,
   normalizeDoiOverride,
   normalizeParamRows,

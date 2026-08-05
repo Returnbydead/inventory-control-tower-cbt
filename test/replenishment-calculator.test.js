@@ -6,6 +6,7 @@ const path = require("node:path");
 const {
   buildCalculator,
   calculationForParam,
+  generationEnabled,
   normalizeDoiOverride,
   normalizePostedTasks,
   normalizeSelectedTaskKeys,
@@ -206,6 +207,22 @@ test("DOI override caps Task Qty at GSheet Storage and rejects invalid DOI", () 
   assert.equal(normalizeDoiOverride("2.5"), 2.5);
   assert.equal(normalizeDoiOverride(""), null);
   assert.throws(() => normalizeDoiOverride(0), /lebih dari 0/);
+});
+
+test("task generation stays locked unless explicitly enabled", () => {
+  const previous = process.env.REPLENISHMENT_GENERATION_ENABLED;
+
+  delete process.env.REPLENISHMENT_GENERATION_ENABLED;
+  assert.equal(generationEnabled(), false);
+
+  process.env.REPLENISHMENT_GENERATION_ENABLED = "true";
+  assert.equal(generationEnabled(), true);
+
+  if (previous === undefined) {
+    delete process.env.REPLENISHMENT_GENERATION_ENABLED;
+  } else {
+    process.env.REPLENISHMENT_GENERATION_ENABLED = previous;
+  }
 });
 
 test("UI renders replenishment quantities as whole Indonesian numbers", () => {

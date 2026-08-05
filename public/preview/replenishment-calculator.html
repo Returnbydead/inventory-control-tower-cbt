@@ -1004,9 +1004,13 @@
 
       function updateGenerateButton() {
         const selectedCount = selectedTaskKeys.size;
+        const generationEnabled = calculatorPayload?.generation_enabled === true;
 
-        byId("generateButton").disabled = loading || selectedCount === 0;
-        byId("generateButton").textContent = selectedCount
+        byId("generateButton").disabled =
+          loading || !generationEnabled || selectedCount === 0;
+        byId("generateButton").textContent = !generationEnabled
+          ? "Generate Dikunci"
+          : selectedCount
           ? `Generate ${qty(selectedCount)} Task`
           : "Generate Task Terpilih";
       }
@@ -1182,8 +1186,10 @@
             `Live · ${formatSnapshot(payload.snapshot_at)}`;
 
           showMessage(
-            `Kalkulasi selesai. ${qty(payload.summary?.task_count)} task kandidat siap direview.`,
-            "success",
+            payload.generation_enabled
+              ? `Kalkulasi selesai. ${qty(payload.summary?.task_count)} task kandidat siap direview.`
+              : "Mode review aktif. Generate dikunci sementara untuk mencegah task duplikat.",
+            payload.generation_enabled ? "success" : "error",
           );
         } catch (error) {
           calculatorPayload = null;
