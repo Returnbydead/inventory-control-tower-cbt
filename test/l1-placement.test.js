@@ -5,6 +5,7 @@ const {
   addressParts,
   evaluateCategory,
   placementAreasForCategory,
+  placementRangesForCategory,
   targetFor,
 } = require("../lib/l1-placement");
 const { aggregateRows, summarize, summarizeByZone, activateReadDatabase } = require("../api/rack-status")._test;
@@ -36,13 +37,13 @@ test("uses first rack number as aisle and second as sequence", () => {
   });
 });
 
-test("applies SRC aisle 18 Tata Rumah only to sequence 13-17", () => {
+test("uses the GSheet mapping for Tata Rumah at SRC1 aisle 07", () => {
   assert.equal(
-    evaluateCategory("CBT-SRC1-18-13-L2-01", "Tata Rumah").result,
+    evaluateCategory("CBT-SRC1-07-13-L2-01", "Tata Rumah").result,
     "COMPLIANT",
   );
   assert.equal(
-    evaluateCategory("CBT-SRC1-18-12-L2-01", "Tata Rumah").result,
+    evaluateCategory("CBT-SRC1-18-13-L2-01", "Tata Rumah").result,
     "WRONG_L1",
   );
 });
@@ -66,19 +67,35 @@ test("maps SRC1 aisles 04-06 to Kebutuhan Cuci Baju and keeps non-halal outside 
   assert.equal(targetFor(`CBT-${zone}-${rackSequence}-01-L1-01`).status, "EXCLUDED");
 });
 
-test("Cokelat exposes the approved SRA1 and MZC2 placement choices", () => {
+test("GSheet screenshot is the only source for SPR placement suggestions", () => {
+  assert.equal(
+    require("../public/data/planogram-gsheet-rules.json").rules.length,
+    37,
+  );
+  assert.equal(
+    evaluateCategory("CBT-SRA1-12-01-L1-01", "Makanan & Susu Bayi").result,
+    "COMPLIANT",
+  );
   assert.equal(
     evaluateCategory("CBT-SRA1-12-01-L1-01", "Cokelat").result,
-    "COMPLIANT",
+    "WRONG_L1",
   );
-  assert.equal(
-    evaluateCategory("CBT-MZC2-10-01-L1-01", "Cokelat").result,
-    "COMPLIANT",
-  );
-  const labels = placementAreasForCategory("Cokelat")
+  const labels = placementAreasForCategory("Minuman")
     .map((area) => `${area.zone}:${area.aisle}`);
-  assert.ok(labels.includes("SRA1:12"));
-  assert.ok(labels.includes("MZC2:10"));
+  assert.deepEqual(labels, [
+    "SRA1:1", "SRA1:2", "SRA1:3", "SRA1:4",
+    "SRA1:5", "SRA1:6", "SRA1:7", "SRA1:8",
+  ]);
+  assert.deepEqual(placementAreasForCategory("Cokelat"), []);
+  assert.deepEqual(placementRangesForCategory("Kebutuhan Pokok"), [
+    {
+      zone: "SRB1",
+      aisle_from: 7,
+      aisle_to: 20,
+      aisle_label: "07-20",
+      source: "Inventory Support Outbound GSheet - PLANOGRAM screenshot supplied 2026-08-05",
+    },
+  ]);
 });
 
 test("aggregates occupied SLOC and marks any wrong category as WRONG_L1", () => {
@@ -90,7 +107,7 @@ test("aggregates occupied SLOC and marks any wrong category as WRONG_L1", () => 
       aisle: "13",
       rack_level: "L2",
       sku_number: "A",
-      l1_category_name: "Tata Rumah",
+      l1_category_name: "Perawatan Rumah",
       l2_category_name: "L2-A",
       stock: 2,
       stock_value: 100,

@@ -87,6 +87,32 @@ test("accepts replenishment source racks through level L7", () => {
   assert.equal(result.summary.shortage_qty, 3);
 });
 
+test("Replenishment suggestion always follows the GSheet planogram range", () => {
+  const result = buildCalculator({
+    params: [param()],
+    sohRows: [
+      storage("CBT-SRC1-20-01-L1-01", 10, {
+        remarks_zone: "PICKFACE",
+        zone: "SRC1",
+        aisle: "20",
+        rack_level: "L1",
+        l1_category_name: "Minuman",
+      }),
+      storage("CBT-SRA1-01-01-L2-01", 8, {
+        zone: "SRA1",
+        aisle: "01",
+        l1_category_name: "Minuman",
+      }),
+    ],
+    existingKeys: [],
+  });
+
+  assert.equal(result.tasks[0].suggested_zone, "SRA1");
+  assert.equal(result.tasks[0].suggested_aisle, "01-08");
+  assert.equal(result.tasks[0].suggested_rack_name, "");
+  assert.equal(result.tasks[0].suggestion_basis, "PLANOGRAM_GSHEET");
+});
+
 test("normalizes existing task keys and emits one candidate per source rack", () => {
   const result = buildCalculator({
     params: [param()],

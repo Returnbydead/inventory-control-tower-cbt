@@ -1,5 +1,5 @@
 const { databaseName, getPool } = require("./sync-soh")._internal;
-const { placementAreasForCategory } = require("../lib/l1-placement");
+const { placementRangesForCategory } = require("../lib/l1-placement");
 
 const SOURCE_ZONES = new Set(["SRA1", "SRB1", "SRC1"]);
 const SOURCE_LEVELS = new Set(["L2", "L3", "L4", "L5", "L6", "L7"]);
@@ -259,34 +259,20 @@ function groupSohRows(rows) {
 }
 
 function suggestionFor(group) {
-  const existingPickface = [...group.pickface].sort(
-    (left, right) =>
-      right.stock - left.stock || left.rack_name.localeCompare(right.rack_name),
-  )[0];
-
-  if (existingPickface) {
-    return {
-      suggested_zone: existingPickface.zone,
-      suggested_aisle: existingPickface.aisle,
-      suggested_rack_name: existingPickface.rack_name,
-      suggestion_basis: "EXISTING_SKU_PICKFACE",
-    };
-  }
-
   const category = group.all
     .map((row) => clean(row.l1_category_name))
     .find(Boolean);
 
-  const area = category ? placementAreasForCategory(category)[0] : null;
+  const area = category ? placementRangesForCategory(category)[0] : null;
 
   return {
     suggested_zone: clean(area?.zone),
 
-    suggested_aisle: area?.aisle ? String(area.aisle).padStart(2, "0") : "",
+    suggested_aisle: clean(area?.aisle_label),
 
     suggested_rack_name: "",
 
-    suggestion_basis: area ? "PLANOGRAM_L1" : "NO_DESTINATION_SUGGESTION",
+    suggestion_basis: area ? "PLANOGRAM_GSHEET" : "NO_DESTINATION_SUGGESTION",
   };
 }
 
