@@ -262,6 +262,43 @@ test("completed or cancelled ledger rows no longer reduce current demand", () =>
   );
 });
 
+test("uses task_key SKU when Google Sheets drops a leading zero", () => {
+  const tasks = normalizeExistingTasks([
+    {
+      task_key: "089686010947|CBT-SRB1-01-10-L2-01",
+      sku_number: "89686010947",
+      allocated_qty: 2855,
+      status: "READY",
+    },
+  ]);
+
+  assert.deepEqual(
+    tasks.map((task) => [task.sku_number, task.allocated_qty]),
+    [["089686010947", 2855]],
+  );
+});
+
+test("leading-zero SKU ledger rows stop a second allocation run", () => {
+  const skuNumber = "089686010947";
+  const result = buildCalculator({
+    params: [param({ sku_number: skuNumber })],
+    sohRows: [storage("RACK-A", 8, { sku_number: skuNumber })],
+    existingTasks: [
+      {
+        task_key: `${skuNumber}|RACK-A`,
+        sku_number: "89686010947",
+        allocated_qty: 8,
+        status: "READY",
+      },
+    ],
+    ledgerMode: "TASKS",
+  });
+
+  assert.equal(result.summary.existing_generated_qty, 8);
+  assert.equal(result.summary.remaining_required_qty, 0);
+  assert.equal(result.summary.task_count, 0);
+});
+
 test("DOI override recalculates Target PF, Need, and Task Qty on the server", () => {
   const result = buildCalculator({
     params: [param()],

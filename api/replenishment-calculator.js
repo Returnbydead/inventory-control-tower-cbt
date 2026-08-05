@@ -328,11 +328,15 @@ function normalizeExistingTasks(tasks) {
             ? buildTaskKey(skuNumber, fromRackName)
             : ""),
       );
+      const taskKeySku = normalizeSku(taskKey.split("|")[0]);
       const status = clean(task?.status).toUpperCase();
 
       return {
         task_key: taskKey,
-        sku_number: skuNumber || normalizeSku(taskKey.split("|")[0]),
+        // Google Sheets may coerce identifiers such as 089686010947 into a
+        // number and drop the leading zero. task_key remains text because it
+        // also contains the rack separator, so it is the canonical SKU source.
+        sku_number: taskKeySku || skuNumber,
         allocated_qty: rounded(task?.allocated_qty),
         status,
       };
