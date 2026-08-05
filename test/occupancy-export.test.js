@@ -1,6 +1,11 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { exportRow, planogramExportRow, selectedZones } = require("../api/occupancy-export")._test;
+const {
+  exportRow,
+  PLANOGRAM_EXPORT_HEADERS,
+  planogramExportRow,
+  selectedZones,
+} = require("../api/occupancy-export")._test;
 const { isExcludedOccupancyRack } = require("../lib/occupancy-exclusions");
 
 test("occupancy export keeps SKU x SLOC detail and L1 compliance", () => {
@@ -28,7 +33,7 @@ test("occupancy export accepts multiple zones", () => {
   assert.deepEqual(selectedZones("MZA1,SRC1"), ["MZA1", "SRC1"]);
 });
 
-test("planogram detail export includes multiple location suggestions and their basis", () => {
+test("planogram detail export mirrors the simple table without values or suggestion basis", () => {
   const row = planogramExportRow({
     sku_number: "899000000002",
     product_name: "Cokelat Test",
@@ -46,14 +51,26 @@ test("planogram detail export includes multiple location suggestions and their b
     wrong_qty: 24,
     wrong_value: 100000,
     suggestions: [
-      { label: "SRA1 · aisle 12", reason: "Teman SKU 40 qty" },
-      { label: "MZC2 · aisle 10", reason: "Cluster L1 200 qty" },
+      { label: "SRA1 - aisle 12", reason: "Teman SKU 40 qty" },
+      { label: "MZC2 - aisle 10", reason: "Cluster L1 200 qty" },
     ],
-  }, "ALL", "2026-08-01T00:00:00.000Z");
-  assert.ok(row.includes("SRA1 · aisle 12"));
-  assert.ok(row.includes("MZC2 · aisle 10"));
-  assert.ok(row.includes("Teman SKU 40 qty"));
-  assert.ok(row.includes("Cluster L1 200 qty"));
+  });
+
+  assert.deepEqual(PLANOGRAM_EXPORT_HEADERS, [
+    "SKU / Produk", "Current Rack", "Zone", "Aisle", "Sequence", "Level",
+    "Current L1", "Quantity", "Wrong Qty", "Target di Lokasi Saat Ini",
+    "Saran Placement", "Status",
+  ]);
+  assert.equal(row.length, PLANOGRAM_EXPORT_HEADERS.length);
+  assert.equal(row[0], "899000000002\nCokelat Test");
+  assert.equal(row[7], 24);
+  assert.equal(row[8], 24);
+  assert.equal(row[9], "Minuman");
+  assert.equal(row[10], "SRA1 - aisle 12\nMZC2 - aisle 10");
+  assert.equal(row[11], "WRONG_L1");
+  assert.ok(!row.includes(100000));
+  assert.ok(!row.join(" ").includes("Teman SKU"));
+  assert.ok(!row.join(" ").includes("Cluster L1"));
 });
 
 test("occupancy export recognises every excluded non-storage location", () => {

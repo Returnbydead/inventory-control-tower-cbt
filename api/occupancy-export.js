@@ -10,6 +10,20 @@ const { fetchLivePlanogramRules } = require("../lib/planogram-live");
 
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
+const PLANOGRAM_EXPORT_HEADERS = Object.freeze([
+  "SKU / Produk",
+  "Current Rack",
+  "Zone",
+  "Aisle",
+  "Sequence",
+  "Level",
+  "Current L1",
+  "Quantity",
+  "Wrong Qty",
+  "Target di Lokasi Saat Ini",
+  "Saran Placement",
+  "Status",
+]);
 
 function clean(value) {
   return String(value ?? "").trim();
@@ -59,29 +73,26 @@ function exportRow(row, scope, snapshot, planogramRules) {
   ];
 }
 
-function planogramExportRow(row, scope, snapshot) {
-  const suggestions = Array.from({ length: 4 }, (_, index) => row.suggestions?.[index] || {});
+function planogramExportRow(row) {
+  const suggestions = (row.suggestions || [])
+    .slice(0, 4)
+    .map((item) => clean(item.label))
+    .filter(Boolean)
+    .join("\n");
+
   return [
-    scope,
-    snapshot,
-    row.sku_number,
-    row.product_name,
-    row.l1_category_name,
-    row.l2_category_name,
+    [clean(row.sku_number), clean(row.product_name)].filter(Boolean).join("\n"),
     row.rack_name,
     row.zone,
     row.aisle,
     row.rack_sequence,
     row.rack_level,
+    row.l1_category_name,
     row.stock,
-    row.stock_value,
-    row.allowed_l1.join(" / "),
-    l1Status({ result: row.status }),
-    row.status,
     row.wrong_qty,
-    row.wrong_value,
-    ...suggestions.flatMap((item) => [item.label || "", item.reason || ""]),
-    "Kandidat placement; cek kapasitas rack sebelum membuat movement task",
+    (row.allowed_l1 || []).join(" / "),
+    suggestions,
+    row.status,
   ];
 }
 
@@ -130,22 +141,12 @@ module.exports = async function handler(req, res) {
       "SKU", "Product Name", "L1 Aktual", "L2 Aktual", "Target L1", "Status L1", "Status Rule",
       "Qty", "Stock Value", "Source Rows",
     ]];
-    const planogramHeaders = [[
-      "Scope", "Snapshot", "SKU", "Product Name", "L1 Aktual", "L2 Aktual",
-      "Current Rack", "Current Zone", "Current Aisle", "Current Sequence", "Current Level",
-      "Qty", "Stock Value", "Target L1 at Current Rack", "Status L1", "Status Rule",
-      "Wrong Qty", "Value Risk",
-      "Suggestion 1 Location", "Suggestion 1 Basis",
-      "Suggestion 2 Location", "Suggestion 2 Basis",
-      "Suggestion 3 Location", "Suggestion 3 Basis",
-      "Suggestion 4 Location", "Suggestion 4 Basis",
-      "Operational Note",
-    ]];
+    const planogramHeaders = [PLANOGRAM_EXPORT_HEADERS];
     const csvRows = planogramDetail
       ? filterPlanogramDetailRows(buildPlanogramDetailRows(rows, planogram.rules), {
         status: req.query.status,
         query: req.query.q,
-      }).map((row) => planogramExportRow(row, scope, snapshot))
+      }).map((row) => planogramExportRow(row))
       : rows.map((row) => exportRow(row, scope, snapshot, planogram.rules));
     const csv = `\uFEFF${[...(planogramDetail ? planogramHeaders : headers), ...csvRows]
       .map((row) => row.map(csvValue).join(",")).join("\r\n")}`;
@@ -163,4 +164,10 @@ module.exports = async function handler(req, res) {
   }
 };
 
-module.exports._test = { exportRow, l1Status, planogramExportRow, selectedZones };
+module.exports._test = {
+  exportRow,
+  l1Status,
+  PLANOGRAM_EXPORT_HEADERS,
+  planogramExportRow,
+  selectedZones,
+};
