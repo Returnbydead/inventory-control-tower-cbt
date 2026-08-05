@@ -327,7 +327,6 @@
       .control-grid {
         display: grid;
         grid-template-columns:
-          minmax(10rem, 0.5fr)
           minmax(15rem, 1fr)
           minmax(12rem, 0.7fr)
           auto
@@ -722,22 +721,11 @@
         <section class="section">
           <header class="section-heading">
             <h1>Generate Replenishment Task</h1>
-            <span>PARAM × DOI dibandingkan dengan live SOH Pickface</span>
+            <span>Task Qty resmi dari PARAM, dibagi ke live source rack</span>
           </header>
 
           <div class="section-body">
             <div class="control-grid">
-              <div class="field">
-                <label for="doiInput">DOI</label>
-                <input
-                  id="doiInput"
-                  type="number"
-                  min="0.1"
-                  step="0.1"
-                  value="1"
-                />
-              </div>
-
               <div class="field">
                 <label for="searchInput"
                   >Cari SKU, produk, atau source rack</label
@@ -780,7 +768,7 @@
         <section class="section">
           <header class="section-heading">
             <h2>Ringkasan Kalkulasi</h2>
-            <span>Hasil menggunakan DOI dan snapshot SOH terbaru</span>
+            <span>DOI dari PARAM dan snapshot SOH terbaru</span>
           </header>
 
           <div id="kpiGrid" class="kpi-grid"></div>
@@ -1090,13 +1078,6 @@
       }
 
       async function loadCalculator() {
-        const doi = numberValue(byId("doiInput").value);
-
-        if (doi <= 0) {
-          showMessage("DOI wajib lebih dari 0.", "error");
-          return;
-        }
-
         loading = true;
         clearMessage();
         selectedTaskKeys.clear();
@@ -1116,7 +1097,6 @@
 
         try {
           const url = new URL(API_URL, window.location.origin);
-          url.searchParams.set("doi", String(doi));
           url.searchParams.set("_ts", String(Date.now()));
 
           const response = await fetch(url, {
@@ -1202,7 +1182,9 @@
               accept: "application/json",
               "content-type": "application/json",
             },
-            body: JSON.stringify({ tasks }),
+            body: JSON.stringify({
+              task_keys: tasks.map((task) => task.task_key),
+            }),
           });
 
           const payload = await response.json();
@@ -1240,12 +1222,6 @@
 
       byId("searchInput").addEventListener("input", renderTasks);
       byId("statusFilter").addEventListener("change", renderTasks);
-
-      byId("doiInput").addEventListener("keydown", (event) => {
-        if (event.key === "Enter") {
-          loadCalculator();
-        }
-      });
 
       byId("selectAll").addEventListener("change", (event) => {
         for (const task of visibleTasks()) {

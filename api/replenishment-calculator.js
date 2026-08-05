@@ -30,6 +30,17 @@ function buildTaskKey(skuNumber, fromRackName) {
   return `${normalizeSku(skuNumber)}|${normalizeRack(fromRackName)}`;
 }
 
+function normalizeTaskKey(value) {
+  const raw = clean(value);
+  const separator = raw.indexOf("|");
+
+  if (separator <= 0 || separator === raw.length - 1) {
+    return "";
+  }
+
+  return buildTaskKey(raw.slice(0, separator), raw.slice(separator + 1));
+}
+
 function gasUrl() {
   const value = clean(process.env.REPLENISHMENT_GAS_URL);
 
@@ -263,7 +274,7 @@ function suggestionFor(group) {
  */
 function buildCalculator({ params, sohRows, existingKeys }) {
   const existingKeySet = new Set(
-    (existingKeys || []).map(clean).filter(Boolean),
+    (existingKeys || []).map(normalizeTaskKey).filter(Boolean),
   );
 
   const sohBySku = groupSohRows(sohRows);
@@ -386,6 +397,7 @@ function buildCalculator({ params, sohRows, existingKeys }) {
     let taskCount = 0;
 
     const pendingTasks = [];
+    const seenSourceKeys = new Set();
 
     for (const source of eligibleSources) {
       if (remainingTaskQty <= 0) {
@@ -393,6 +405,12 @@ function buildCalculator({ params, sohRows, existingKeys }) {
       }
 
       const taskKey = buildTaskKey(param.sku_number, source.rack_name);
+
+      if (seenSourceKeys.has(taskKey)) {
+        continue;
+      }
+
+      seenSourceKeys.add(taskKey);
 
       /**
        * SKU + source rack yang sudah pernah dibuat
@@ -669,7 +687,23 @@ function normalizePostedTasks(tasks) {
       throw new Error(`allocated_qty SKU ${skuNumber} harus lebih dari 0.`);
     }
 
+    const sourceStock = rounded(task.source_stock);
+    const replenishQty = rounded(task.replenish_qty);
+
+    if (sourceStock <= 0 || allocatedQty > sourceStock) {
+      throw new Error(
+        `allocated_qty SKU ${skuNumber} tidak boleh melebihi source_stock.`,
+      );
+    }
+
+    if (replenishQty <= 0 || allocatedQty > replenishQty) {
+      throw new Error(
+        `allocated_qty SKU ${skuNumber} tidak boleh melebihi replenish_qty.`,
+      );
+    }
+
     return {
+      task_key: buildTaskKey(skuNumber, fromRackName),
       product_id: clean(task.product_id),
       sku_number: skuNumber,
       product_name: clean(task.product_name),
@@ -680,11 +714,11 @@ function normalizePostedTasks(tasks) {
 
       pickface_stock: rounded(task.pickface_stock),
 
-      replenish_qty: rounded(task.replenish_qty),
+      replenish_qty: replenishQty,
 
       from_rack_name: fromRackName,
 
-      source_stock: rounded(task.source_stock),
+      source_stock: sourceStock,
 
       allocated_qty: allocatedQty,
 
@@ -692,9 +726,100 @@ function normalizePostedTasks(tasks) {
 
       suggested_aisle: clean(task.suggested_aisle),
 
+      suggested_rack_name: normalizeRack(task.suggested_rack_name),
+
       status: clean(task.status) || "GENERATED",
     };
   });
+}
+
+function normalizeSelectedTaskKeys(taskKeys) {
+  if (!Array.isArray(taskKeys)) {
+    const error = new Error("Payload task_keys wajib berupa array.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const normalizedKeys = taskKeys.map(normalizeTaskKey);
+
+  if (normalizedKeys.some((key) => !key)) {
+    const error = new Error("Setiap task_key wajib berformat SKU|SOURCE_RACK.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const normalized = [...new Set(normalizedKeys)];
+
+  if (!normalized.length) {
+    const error = new Error("Tidak ada task yang dipilih.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (normalized.length > MAX_POST_TASKS) {
+    const error = new Error(
+      `Maksimal ${MAX_POST_TASKS} task dalam satu request.`,
+    );
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return normalized;
+}
+
+function selectCurrentTasks(tasks, selectedKeys) {
+  const currentByKey = new Map(
+    (tasks || []).map((task) => [normalizeTaskKey(task.task_key), task]),
+  );
+
+  const missingKeys = selectedKeys.filter((key) => !currentByKey.has(key));
+
+  if (missingKeys.length) {
+    const error = new Error(
+      "Kandidat task sudah berubah. Refresh kalkulasi lalu pilih ulang task.",
+    );
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const selectedTasks = selectedKeys.map((key) => currentByKey.get(key));
+  const allocatedBySku = new Map();
+
+  for (const task of selectedTasks) {
+    const skuNumber = normalizeSku(task.sku_number);
+    allocatedBySku.set(
+      skuNumber,
+      rounded((allocatedBySku.get(skuNumber) || 0) + task.allocated_qty),
+    );
+  }
+
+  for (const task of selectedTasks) {
+    const allocatedQty = allocatedBySku.get(normalizeSku(task.sku_number)) || 0;
+
+    if (allocatedQty > rounded(task.task_qty)) {
+      throw new Error(
+        `Total allocated_qty SKU ${task.sku_number} melebihi Task Qty terbaru.`,
+      );
+    }
+  }
+
+  return selectedTasks;
+}
+
+async function loadCalculatorInputs() {
+  const [paramPayload, keyPayload] = await Promise.all([
+    fetchGasAction("param"),
+    fetchGasAction("keys"),
+  ]);
+
+  const params = normalizeParamRows(paramPayload.rows);
+  const sohRows = await loadSohRows(params);
+
+  return {
+    params,
+    sohRows,
+    existingKeys: keyPayload.keys,
+  };
 }
 
 async function handleGet(req, res) {
@@ -702,28 +827,20 @@ async function handleGet(req, res) {
    * Query DOI dari frontend lama diabaikan.
    * DOI resmi berasal dari GSheet.
    */
-  const [paramPayload, keyPayload] = await Promise.all([
-    fetchGasAction("param"),
-    fetchGasAction("keys"),
-  ]);
-
-  const params = normalizeParamRows(paramPayload.rows);
-
-  const sohRows = await loadSohRows(params);
+  const inputs = await loadCalculatorInputs();
 
   return json(
     res,
     200,
-    buildCalculator({
-      params,
-      sohRows,
-      existingKeys: keyPayload.keys,
-    }),
+    buildCalculator(inputs),
   );
 }
 
 async function handlePost(req, res) {
-  const tasks = normalizePostedTasks(req.body?.tasks);
+  const selectedKeys = normalizeSelectedTaskKeys(req.body?.task_keys);
+  const calculator = buildCalculator(await loadCalculatorInputs());
+  const currentTasks = selectCurrentTasks(calculator.tasks, selectedKeys);
+  const tasks = normalizePostedTasks(currentTasks);
 
   const result = await postTasksToGas(tasks);
 
@@ -760,7 +877,7 @@ module.exports = async function handler(req, res) {
       message: error.message,
     });
 
-    return json(res, 500, {
+    return json(res, Number(error.statusCode) || 500, {
       ok: false,
 
       message: error.message || "Replenishment calculator gagal.",
@@ -774,5 +891,8 @@ module.exports._test = {
   groupSohRows,
   normalizeParamRows,
   normalizePostedTasks,
+  normalizeSelectedTaskKeys,
+  normalizeTaskKey,
+  selectCurrentTasks,
   suggestionFor,
 };
