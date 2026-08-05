@@ -6,6 +6,7 @@ const {
   PLANOGRAM_EXPORT_HEADERS,
   planogramExportRow,
   selectedZones,
+  suggestionLabel,
 } = require("../api/occupancy-export")._test;
 const { isExcludedOccupancyRack } = require("../lib/occupancy-exclusions");
 
@@ -58,17 +59,18 @@ test("planogram detail export mirrors the simple table without values or suggest
   });
 
   assert.deepEqual(PLANOGRAM_EXPORT_HEADERS, [
-    "SKU / Produk", "Current Rack", "Zone", "Aisle", "Sequence", "Level",
+    "SKU Number", "Product Name", "Current Rack", "Zone", "Aisle", "Sequence", "Level",
     "Current L1", "Quantity", "Wrong Qty", "Target di Lokasi Saat Ini",
     "Saran Placement", "Status",
   ]);
   assert.equal(row.length, PLANOGRAM_EXPORT_HEADERS.length);
-  assert.equal(row[0], "899000000002 - Cokelat Test");
-  assert.equal(row[7], 24);
+  assert.equal(row[0], "899000000002");
+  assert.equal(row[1], "Cokelat Test");
   assert.equal(row[8], 24);
-  assert.equal(row[9], "Minuman");
-  assert.equal(row[10], "SRA1 - aisle 12 | MZC2 - aisle 10");
-  assert.equal(row[11], "WRONG_L1");
+  assert.equal(row[9], 24);
+  assert.equal(row[10], "Minuman");
+  assert.equal(row[11], "SRA1 - aisle 12 | MZC2 - aisle 10");
+  assert.equal(row[12], "WRONG_L1");
   assert.ok(!row.includes(100000));
   assert.ok(!row.join(" ").includes("Teman SKU"));
   assert.ok(!row.join(" ").includes("Cluster L1"));
@@ -77,13 +79,18 @@ test("planogram detail export mirrors the simple table without values or suggest
 test("planogram CSV opens in regional Excel with separate columns and one row per record", () => {
   const csv = buildCsv([
     PLANOGRAM_EXPORT_HEADERS,
-    ["899 - Produk", "CBT-SRA1-01-01-L1-01", "SRA1"],
+    ["899", "Produk", "CBT-SRA1-01-01-L1-01", "SRA1"],
   ], { delimiter: ";", excelSeparator: true });
 
   assert.ok(csv.startsWith("\uFEFFsep=;\r\n"));
-  assert.match(csv, /"SKU \/ Produk";"Current Rack";"Zone"/);
-  assert.match(csv, /\r\n"899 - Produk";"CBT-SRA1-01-01-L1-01";"SRA1"$/);
+  assert.match(csv, /"SKU Number";"Product Name";"Current Rack";"Zone"/);
+  assert.match(csv, /\r\n"899";"Produk";"CBT-SRA1-01-01-L1-01";"SRA1"$/);
   assert.equal(csv.split("\r\n").length, 3);
+});
+
+test("suggestion labels remove mojibake and special middle dots", () => {
+  assert.equal(suggestionLabel("SRC1 \u00c2\u00b7 aisle 14"), "SRC1 - aisle 14");
+  assert.equal(suggestionLabel("SRA1 \u00b7 aisle 13"), "SRA1 - aisle 13");
 });
 
 test("occupancy export recognises every excluded non-storage location", () => {

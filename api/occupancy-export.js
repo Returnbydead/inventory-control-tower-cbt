@@ -11,7 +11,8 @@ const { fetchLivePlanogramRules } = require("../lib/planogram-live");
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
 const PLANOGRAM_EXPORT_HEADERS = Object.freeze([
-  "SKU / Produk",
+  "SKU Number",
+  "Product Name",
   "Current Rack",
   "Zone",
   "Aisle",
@@ -38,6 +39,15 @@ function buildCsv(rows, { delimiter = ",", excelSeparator = false } = {}) {
   return `\uFEFF${separatorHint}${rows
     .map((row) => row.map(csvValue).join(delimiter))
     .join("\r\n")}`;
+}
+
+function suggestionLabel(value) {
+  return clean(value)
+    .replaceAll("\u00c2\u00b7", "-")
+    .replaceAll("\u00b7", "-")
+    .replace(/\s*-\s*/g, " - ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function selectedZones(value) {
@@ -83,12 +93,13 @@ function exportRow(row, scope, snapshot, planogramRules) {
 function planogramExportRow(row) {
   const suggestions = (row.suggestions || [])
     .slice(0, 4)
-    .map((item) => clean(item.label))
+    .map((item) => suggestionLabel(item.label))
     .filter(Boolean)
     .join(" | ");
 
   return [
-    [clean(row.sku_number), clean(row.product_name)].filter(Boolean).join(" - "),
+    clean(row.sku_number),
+    clean(row.product_name),
     row.rack_name,
     row.zone,
     row.aisle,
@@ -182,4 +193,5 @@ module.exports._test = {
   PLANOGRAM_EXPORT_HEADERS,
   planogramExportRow,
   selectedZones,
+  suggestionLabel,
 };
