@@ -1210,6 +1210,8 @@
           showMessage(
             payload.generation_enabled
               ? `Kalkulasi selesai. ${qty(payload.summary?.task_count)} task kandidat siap direview.`
+              : payload.generation_block_reason === "OVERGENERATED"
+                ? `Generate dikunci: ledger memiliki ${qty(payload.summary?.overgenerated_qty)} qty overgenerated. Rekonsiliasi task aktif diperlukan.`
               : payload.ledger_ready
                 ? "Mode review aktif. Generate dikunci sementara dari konfigurasi server."
                 : "Mode review aktif. Generate dikunci sampai ledger task aktif terbaca lengkap.",

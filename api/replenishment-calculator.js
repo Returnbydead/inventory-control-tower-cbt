@@ -692,12 +692,24 @@ function buildCalculator({
 
   const sheetDoi =
     params.map((row) => rounded(row.doi)).find((value) => value > 0) || 0;
+  const ledgerReady = ledgerMode === "TASKS";
+  const ledgerSafe = ledgerReady && rounded(totalOvergeneratedQty) <= 0;
+  const generationConfigured = generationEnabled();
+  const generationBlockReason = !ledgerReady
+    ? "LEDGER_UNAVAILABLE"
+    : !ledgerSafe
+      ? "OVERGENERATED"
+      : !generationConfigured
+        ? "SERVER_CONFIG"
+        : null;
 
   return {
     ok: true,
-    generation_enabled: generationEnabled() && ledgerMode === "TASKS",
+    generation_enabled: generationConfigured && ledgerSafe,
+    generation_block_reason: generationBlockReason,
     ledger_mode: ledgerMode,
-    ledger_ready: ledgerMode === "TASKS",
+    ledger_ready: ledgerReady,
+    ledger_safe: ledgerSafe,
 
     /**
      * Dipertahankan agar frontend lama tidak error.
@@ -1050,6 +1062,14 @@ async function handlePost(req, res) {
   if (!calculator.ledger_ready) {
     const error = new Error(
       "Generate task tetap dikunci karena ledger GAS belum mengirim detail task aktif.",
+    );
+    error.statusCode = 423;
+    throw error;
+  }
+
+  if (!calculator.ledger_safe) {
+    const error = new Error(
+      "Generate task dikunci karena ledger memiliki qty overgenerated. Rekonsiliasi task aktif diperlukan sebelum generate berikutnya.",
     );
     error.statusCode = 423;
     throw error;

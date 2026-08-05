@@ -232,6 +232,8 @@ test("a fully generated SKU has no second-run candidates", () => {
 });
 
 test("duplicate active rows are surfaced as overgenerated and never create more candidates", () => {
+  const previous = process.env.REPLENISHMENT_GENERATION_ENABLED;
+  process.env.REPLENISHMENT_GENERATION_ENABLED = "true";
   const result = buildCalculator({
     params: [param()],
     sohRows: [storage("RACK-A", 5), storage("RACK-B", 10)],
@@ -247,6 +249,15 @@ test("duplicate active rows are surfaced as overgenerated and never create more 
   assert.equal(result.summary.overgenerated_qty, 5);
   assert.equal(result.summary.remaining_required_qty, 0);
   assert.equal(result.summary.task_count, 0);
+  assert.equal(result.ledger_safe, false);
+  assert.equal(result.generation_enabled, false);
+  assert.equal(result.generation_block_reason, "OVERGENERATED");
+
+  if (previous === undefined) {
+    delete process.env.REPLENISHMENT_GENERATION_ENABLED;
+  } else {
+    process.env.REPLENISHMENT_GENERATION_ENABLED = previous;
+  }
 });
 
 test("completed or cancelled ledger rows no longer reduce current demand", () => {
