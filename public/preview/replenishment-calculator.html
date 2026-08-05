@@ -1304,24 +1304,36 @@
           const payload = await response.json();
 
           if (!response.ok || !payload?.ok) {
-            throw new Error(
+            const generateError = new Error(
               payload?.message ||
                 `Generate task gagal: HTTP ${response.status}`,
             );
+            generateError.partialResult = payload?.partial_result || null;
+            throw generateError;
           }
 
           selectedTaskKeys.clear();
 
           showMessage(
             `${qty(payload.inserted)} task berhasil dibuat. ` +
-              `${qty(payload.skipped)} task dilewati karena sudah pernah tergenerate.`,
+              `${qty(payload.skipped)} task dilewati karena sudah pernah tergenerate. ` +
+              `Diproses dalam ${qty(payload.batch_count || 1)} batch.`,
             "success",
           );
 
           await loadCalculator();
         } catch (error) {
-          showMessage(error.message, "error");
-          byId("freshness").textContent = "Generate task gagal";
+          if (error.partialResult) {
+            selectedTaskKeys.clear();
+            await loadCalculator();
+            showMessage(
+              `${error.message} Kalkulasi sudah dimuat ulang; generate kembali hanya untuk task yang masih tersisa.`,
+              "error",
+            );
+          } else {
+            showMessage(error.message, "error");
+            byId("freshness").textContent = "Generate task gagal";
+          }
         } finally {
           loading = false;
           byId("calculateButton").disabled = false;

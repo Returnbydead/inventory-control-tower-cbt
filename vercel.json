@@ -39,7 +39,7 @@
       "maxDuration": 300
     },
     "api/replenishment-calculator.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     }
   }
 }

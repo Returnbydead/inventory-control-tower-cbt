@@ -12,6 +12,7 @@ const {
   normalizePostedTasks,
   normalizeSelectedTaskKeys,
   normalizeTaskKey,
+  postTasksInBatches,
   selectCurrentTasks,
 } = require("../api/replenishment-calculator")._test;
 
@@ -241,6 +242,36 @@ test("UI sends task keys with the active DOI override", () => {
   assert.match(html, /task_keys:\s*tasks\.map/);
   assert.match(html, /doi_override: loadedDoiOverride/);
   assert.match(html, /Gunakan DOI PARAM atau override/);
+});
+
+test("select all accepts more than 1000 task keys", () => {
+  const keys = Array.from(
+    { length: 1153 },
+    (_, index) => `SKU${index}|CBT-SRA1-${String(index).padStart(4, "0")}-L2-01`,
+  );
+
+  assert.equal(normalizeSelectedTaskKeys(keys).length, 1153);
+});
+
+test("large generations are sent to GAS in guarded sequential batches", async () => {
+  const sizes = [];
+  const result = await postTasksInBatches(
+    Array.from({ length: 1153 }, (_, index) => ({ task_key: `TASK-${index}` })),
+    async (batch) => {
+      sizes.push(batch.length);
+      return {
+        inserted: batch.length - 1,
+        skipped: 1,
+        skipped_rows: [batch[0].task_key],
+      };
+    },
+  );
+
+  assert.deepEqual(sizes, [1000, 153]);
+  assert.equal(result.inserted, 1151);
+  assert.equal(result.skipped, 2);
+  assert.equal(result.batch_count, 2);
+  assert.equal(result.skipped_rows.length, 2);
 });
 
 test("subtracts active generated quantity per SKU before using another source rack", () => {

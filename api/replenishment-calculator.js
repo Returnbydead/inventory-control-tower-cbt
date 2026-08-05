@@ -4,7 +4,8 @@ const { fetchLivePlanogramRules } = require("../lib/planogram-live");
 
 const SOURCE_ZONES = new Set(["SRA1", "SRB1", "SRC1"]);
 const SOURCE_LEVELS = new Set(["L2", "L3", "L4", "L5", "L6", "L7"]);
-const MAX_POST_TASKS = 1000;
+const GAS_TASK_BATCH_SIZE = 1000;
+const MAX_SELECTED_TASKS = 5000;
 
 function generationEnabled() {
   return clean(process.env.REPLENISHMENT_GENERATION_ENABLED).toLowerCase() === "true";
@@ -125,6 +126,10 @@ async function fetchGasAction(action) {
 }
 
 async function postTasksToGas(tasks) {
+  if (!Array.isArray(tasks) || tasks.length > GAS_TASK_BATCH_SIZE) {
+    throw new Error(`Maksimal ${GAS_TASK_BATCH_SIZE} task per batch GAS.`);
+  }
+
   const response = await fetch(gasUrl(), {
     method: "POST",
     redirect: "follow",
@@ -144,6 +149,40 @@ async function postTasksToGas(tasks) {
   }
 
   return payload;
+}
+
+async function postTasksInBatches(tasks, sendBatch = postTasksToGas) {
+  const result = {
+    inserted: 0,
+    skipped: 0,
+    skipped_rows: [],
+    batch_count: 0,
+  };
+
+  for (let offset = 0; offset < tasks.length; offset += GAS_TASK_BATCH_SIZE) {
+    const batch = tasks.slice(offset, offset + GAS_TASK_BATCH_SIZE);
+
+    try {
+      const payload = await sendBatch(batch);
+      result.inserted += number(payload.inserted);
+      result.skipped += number(payload.skipped);
+      result.skipped_rows.push(
+        ...(Array.isArray(payload.skipped_rows) ? payload.skipped_rows : []),
+      );
+      result.batch_count += 1;
+    } catch (cause) {
+      const error = new Error(
+        result.inserted > 0
+          ? `${result.inserted} task sudah tersimpan, tetapi batch berikutnya gagal: ${cause.message}`
+          : `Penyimpanan task gagal pada batch pertama: ${cause.message}`,
+      );
+      error.statusCode = 502;
+      error.partialResult = { ...result };
+      throw error;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -859,8 +898,8 @@ function normalizePostedTasks(tasks) {
     throw new Error("Tidak ada task yang dipilih.");
   }
 
-  if (tasks.length > MAX_POST_TASKS) {
-    throw new Error(`Maksimal ${MAX_POST_TASKS} task dalam satu request.`);
+  if (tasks.length > MAX_SELECTED_TASKS) {
+    throw new Error(`Maksimal ${MAX_SELECTED_TASKS} task dalam satu proses generate.`);
   }
 
   return tasks.map((task) => {
@@ -949,9 +988,9 @@ function normalizeSelectedTaskKeys(taskKeys) {
     throw error;
   }
 
-  if (normalized.length > MAX_POST_TASKS) {
+  if (normalized.length > MAX_SELECTED_TASKS) {
     const error = new Error(
-      `Maksimal ${MAX_POST_TASKS} task dalam satu request.`,
+      `Maksimal ${MAX_SELECTED_TASKS} task dalam satu proses generate.`,
     );
     error.statusCode = 400;
     throw error;
@@ -1085,7 +1124,7 @@ async function handlePost(req, res) {
   const currentTasks = selectCurrentTasks(calculator.tasks, selectedKeys);
   const tasks = normalizePostedTasks(currentTasks);
 
-  const result = await postTasksToGas(tasks);
+  const result = await postTasksInBatches(tasks);
 
   return json(res, 200, {
     ok: true,
@@ -1095,6 +1134,8 @@ async function handlePost(req, res) {
     skipped: number(result.skipped),
 
     skipped_rows: Array.isArray(result.skipped_rows) ? result.skipped_rows : [],
+
+    batch_count: number(result.batch_count),
   });
 }
 
@@ -1124,6 +1165,8 @@ module.exports = async function handler(req, res) {
       ok: false,
 
       message: error.message || "Replenishment calculator gagal.",
+
+      ...(error.partialResult ? { partial_result: error.partialResult } : {}),
     });
   }
 };
@@ -1140,6 +1183,7 @@ module.exports._test = {
   normalizePostedTasks,
   normalizeSelectedTaskKeys,
   normalizeTaskKey,
+  postTasksInBatches,
   selectCurrentTasks,
   suggestionFor,
 };
