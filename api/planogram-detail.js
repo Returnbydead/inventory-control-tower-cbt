@@ -3,6 +3,7 @@ const {
   buildPlanogramDetailRows,
   filterPlanogramDetailRows,
 } = require("../lib/planogram-detail");
+const { fetchLivePlanogramRules } = require("../lib/planogram-live");
 
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
@@ -41,6 +42,7 @@ module.exports = async function handler(req, res) {
 
   let client;
   try {
+    const planogram = await fetchLivePlanogramRules();
     client = await getPool().connect();
     await client.query(`USE ${databaseName()}`);
     const result = await client.query(`
@@ -58,7 +60,7 @@ module.exports = async function handler(req, res) {
         l1_category_name, l2_category_name
     `, [zones.includes(ALL_ZONES) ? ALL_ZONES : "", zones]);
 
-    const allRows = buildPlanogramDetailRows(result.rows);
+    const allRows = buildPlanogramDetailRows(result.rows, planogram.rules);
     const filtered = filterPlanogramDetailRows(allRows, {
       status: req.query.status,
       query: req.query.q,
@@ -75,11 +77,13 @@ module.exports = async function handler(req, res) {
     }, null);
     const limit = limitValue(req.query.limit);
 
-    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
       ok: true,
       zones,
       snapshot_at: snapshotAt,
+      planogram_source: planogram.source,
+      planogram_rule_count: planogram.rule_count,
       grain: "1 row = 1 SKU x occupied location",
       total: filtered.length,
       limit,

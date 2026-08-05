@@ -1,5 +1,6 @@
 const { databaseName, getPool } = require("./sync-soh")._internal;
 const { placementRangesForCategory } = require("../lib/l1-placement");
+const { fetchLivePlanogramRules } = require("../lib/planogram-live");
 
 const SOURCE_ZONES = new Set(["SRA1", "SRB1", "SRC1"]);
 const SOURCE_LEVELS = new Set(["L2", "L3", "L4", "L5", "L6", "L7"]);
@@ -258,12 +259,14 @@ function groupSohRows(rows) {
   return bySku;
 }
 
-function suggestionFor(group) {
+function suggestionFor(group, planogramRules) {
   const category = group.all
     .map((row) => clean(row.l1_category_name))
     .find(Boolean);
 
-  const area = category ? placementRangesForCategory(category)[0] : null;
+  const area = category
+    ? placementRangesForCategory(category, planogramRules)[0]
+    : null;
 
   return {
     suggested_zone: clean(area?.zone),
@@ -354,6 +357,8 @@ function buildCalculator({
   sohRows,
   existingKeys,
   existingTasks,
+  planogramRules,
+  planogramSource = "",
   ledgerMode = "KEYS_ONLY",
   doiOverride = null,
 }) {
@@ -528,7 +533,7 @@ function buildCalculator({
         group.all.find((row) => row.product_name)?.product_name,
     );
 
-    const suggestion = suggestionFor(group);
+    const suggestion = suggestionFor(group, planogramRules);
 
     /**
      * Source rack valid:
@@ -714,6 +719,8 @@ function buildCalculator({
     doi_override: doiOverride,
 
     snapshot_at: snapshotAt,
+    planogram_source: planogramSource,
+    planogram_rule_count: Array.isArray(planogramRules) ? planogramRules.length : 0,
 
     summary: {
       param_sku_count: params.length,
@@ -993,7 +1000,7 @@ function selectCurrentTasks(tasks, selectedKeys) {
 }
 
 async function loadCalculatorInputs(doiOverride = null) {
-  const [paramPayload, ledgerPayload] = await Promise.all([
+  const [paramPayload, ledgerPayload, planogramPayload] = await Promise.all([
     fetchGasAction("param"),
     fetchGasAction("tasks")
       .then((payload) => {
@@ -1016,6 +1023,7 @@ async function loadCalculatorInputs(doiOverride = null) {
           ledgerMode: "KEYS_ONLY",
         };
       }),
+    fetchLivePlanogramRules(),
   ]);
 
   const params = normalizeParamRows(paramPayload.rows);
@@ -1025,6 +1033,8 @@ async function loadCalculatorInputs(doiOverride = null) {
     params,
     sohRows,
     ...ledgerPayload,
+    planogramRules: planogramPayload.rules,
+    planogramSource: planogramPayload.source,
     doiOverride,
   };
 }

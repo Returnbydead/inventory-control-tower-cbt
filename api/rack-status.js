@@ -1,5 +1,6 @@
 const { databaseName, getPool } = require("./sync-soh")._internal;
 const { evaluateCategory, targetFor } = require("../lib/l1-placement");
+const { fetchLivePlanogramRules } = require("../lib/planogram-live");
 
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
 const ALL_ZONES = "ALL";
@@ -13,14 +14,14 @@ function number(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function aggregateRows(rows) {
+function aggregateRows(rows, planogramRules) {
   const locations = new Map();
   for (const row of rows) {
     const rackName = clean(row.rack_name);
     if (!rackName) continue;
     let location = locations.get(rackName);
     if (!location) {
-      const target = targetFor(rackName);
+      const target = targetFor(rackName, planogramRules);
       location = {
         rack_name: rackName,
         zone: clean(target.address?.zone || row.zone),
@@ -43,7 +44,7 @@ function aggregateRows(rows) {
 
     const qty = number(row.stock);
     const value = number(row.stock_value);
-    const evaluation = evaluateCategory(rackName, row.l1_category_name);
+    const evaluation = evaluateCategory(rackName, row.l1_category_name, planogramRules);
     location.qty += qty;
     location.stock_value += value;
     if (evaluation.result === "WRONG_L1") {
@@ -150,6 +151,7 @@ module.exports = async function handler(req, res) {
 
   let client;
   try {
+    const planogram = await fetchLivePlanogramRules();
     client = await getPool().connect();
     // This is a read endpoint. Schema creation also creates indexes and a
     // MotherDuck share, which can exceed a serverless request budget.
@@ -164,18 +166,20 @@ module.exports = async function handler(req, res) {
         AND stock > 0
       ORDER BY rack_name, sku_number
     `, [allZones ? ALL_ZONES : "", selectedZones]);
-    const locations = aggregateRows(result.rows);
+    const locations = aggregateRows(result.rows, planogram.rules);
     const snapshotAt = result.rows.reduce((latest, row) => {
       const value = row.synced_at ? new Date(row.synced_at).toISOString() : null;
       return value && (!latest || value > latest) ? value : latest;
     }, null);
 
-    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
       ok: true,
       zone: allZones ? ALL_ZONES : selectedZones.join(","),
       zones: allZones ? [ALL_ZONES] : selectedZones,
       snapshot_at: snapshotAt,
+      planogram_source: planogram.source,
+      planogram_rule_count: planogram.rule_count,
       empty_semantics: "Master SLOC absent from locations is EMPTY.",
       summary: summarize(locations),
       ...(allZones || selectedZones.length > 1 ? { zone_summaries: summarizeByZone(locations) } : {}),

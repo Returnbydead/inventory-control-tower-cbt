@@ -113,6 +113,29 @@ test("Replenishment suggestion always follows the GSheet planogram range", () =>
   assert.equal(result.tasks[0].suggestion_basis, "PLANOGRAM_GSHEET");
 });
 
+test("Replenishment suggestion uses the live Planogram payload", () => {
+  const result = buildCalculator({
+    params: [param()],
+    sohRows: [storage("CBT-SRA1-01-01-L2-01", 8, {
+      l1_category_name: "Minuman",
+    })],
+    existingKeys: [],
+    planogramRules: [{
+      category: "Minuman",
+      zone: "SRB1",
+      aisle_from: 19,
+      aisle_to: 20,
+      source: "GSHEET_LIVE",
+    }],
+    planogramSource: "GSHEET_LIVE",
+  });
+
+  assert.equal(result.tasks[0].suggested_zone, "SRB1");
+  assert.equal(result.tasks[0].suggested_aisle, "19-20");
+  assert.equal(result.planogram_source, "GSHEET_LIVE");
+  assert.equal(result.planogram_rule_count, 1);
+});
+
 test("normalizes existing task keys and emits one candidate per source rack", () => {
   const result = buildCalculator({
     params: [param()],

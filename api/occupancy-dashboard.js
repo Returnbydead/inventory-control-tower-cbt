@@ -4,6 +4,7 @@ const { databaseName, getPool } = require("./sync-soh")._internal;
 const { evaluateCategory, normalizeCategory } = require("../lib/l1-placement");
 const { summarizeOccupancy } = require("../lib/occupancy");
 const { isExcludedOccupancyRack } = require("../lib/occupancy-exclusions");
+const { fetchLivePlanogramRules } = require("../lib/planogram-live");
 
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
@@ -24,7 +25,7 @@ async function loadMaster() {
   return masterPromise;
 }
 
-function aggregateLiveRows(rows) {
+function aggregateLiveRows(rows, planogramRules) {
   const byRack = new Map();
   for (const row of rows) {
     const rackName = clean(row.rack_name);
@@ -41,7 +42,7 @@ function aggregateLiveRows(rows) {
     item.qty += qty;
     item.qty_by_l1.set(category, number(item.qty_by_l1.get(category)) + qty);
     item.used_sloc_by_l1.add(category);
-    if (evaluateCategory(rackName, row.l1_category_name).result === "WRONG_L1") {
+    if (evaluateCategory(rackName, row.l1_category_name, planogramRules).result === "WRONG_L1") {
       item.wrong_qty += qty;
       item.wrong_qty_by_l1.set(category, number(item.wrong_qty_by_l1.get(category)) + qty);
     }
@@ -63,6 +64,7 @@ module.exports = async function handler(req, res) {
   }
   let client;
   try {
+    const planogram = await fetchLivePlanogramRules();
     client = await getPool().connect();
     await client.query(`USE ${databaseName()}`);
     const result = await client.query(`
@@ -70,7 +72,7 @@ module.exports = async function handler(req, res) {
       FROM soh_current
       WHERE stock > 0 AND ($1 = 'ALL' OR UPPER(zone) = ANY($2::text[]))
     `, [selectedZones.includes(ALL_ZONES) ? ALL_ZONES : "", selectedZones]);
-    const liveByRack = aggregateLiveRows(result.rows);
+    const liveByRack = aggregateLiveRows(result.rows, planogram.rules);
     const master = await loadMaster();
     const allowedZones = selectedZones.includes(ALL_ZONES) ? null : new Set(selectedZones);
     const scopedMaster = allowedZones ? {
@@ -80,17 +82,19 @@ module.exports = async function handler(req, res) {
         return allowedZones.has(String(master.dictionaries.zone?.[row[zoneField]] || "").toUpperCase());
       }),
     } : master;
-    const dashboard = summarizeOccupancy(scopedMaster, liveByRack);
+    const dashboard = summarizeOccupancy(scopedMaster, liveByRack, undefined, planogram.rules);
     const snapshotAt = result.rows.reduce((latest, row) => {
       const value = row.synced_at ? new Date(row.synced_at).toISOString() : null;
       return value && (!latest || value > latest) ? value : latest;
     }, null);
-    res.setHeader("Cache-Control", "public, s-maxage=60, stale-while-revalidate=300");
+    res.setHeader("Cache-Control", "no-store");
     return res.status(200).json({
       ok: true,
       zones: selectedZones,
       available_zones: dashboard.zones.map((row) => row.zone),
       snapshot_at: snapshotAt,
+      planogram_source: planogram.source,
+      planogram_rule_count: planogram.rule_count,
       ...dashboard,
     });
   } catch (error) {

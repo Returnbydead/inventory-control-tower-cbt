@@ -98,6 +98,32 @@ test("GSheet screenshot is the only source for SPR placement suggestions", () =>
   ]);
 });
 
+test("live Planogram rules override the bundled snapshot", () => {
+  const liveRules = [{
+    category: "Minuman",
+    zone: "SRB1",
+    aisle_from: 19,
+    aisle_to: 20,
+    source: "GSHEET_LIVE",
+  }];
+
+  assert.equal(
+    evaluateCategory("CBT-SRB1-19-01-L1-01", "Minuman", liveRules).result,
+    "COMPLIANT",
+  );
+  assert.equal(
+    evaluateCategory("CBT-SRA1-01-01-L1-01", "Minuman", liveRules).result,
+    "NO_TARGET",
+  );
+  assert.deepEqual(placementRangesForCategory("Minuman", liveRules), [{
+    zone: "SRB1",
+    aisle_from: 19,
+    aisle_to: 20,
+    aisle_label: "19-20",
+    source: "GSHEET_LIVE",
+  }]);
+});
+
 test("aggregates occupied SLOC and marks any wrong category as WRONG_L1", () => {
   const rows = [
     {

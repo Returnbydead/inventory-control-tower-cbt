@@ -6,6 +6,7 @@ const {
   buildPlanogramDetailRows,
   filterPlanogramDetailRows,
 } = require("../lib/planogram-detail");
+const { fetchLivePlanogramRules } = require("../lib/planogram-live");
 
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
@@ -34,8 +35,8 @@ function l1Status(evaluation) {
   return "TIDAK ADA TARGET";
 }
 
-function exportRow(row, scope, snapshot) {
-  const evaluation = evaluateCategory(row.rack_name, row.l1_category_name);
+function exportRow(row, scope, snapshot, planogramRules) {
+  const evaluation = evaluateCategory(row.rack_name, row.l1_category_name, planogramRules);
   return [
     scope,
     snapshot,
@@ -99,6 +100,7 @@ module.exports = async function handler(req, res) {
 
   let client;
   try {
+    const planogram = await fetchLivePlanogramRules();
     client = await getPool().connect();
     await client.query(`USE ${databaseName()}`);
     const result = await client.query(`
@@ -140,11 +142,11 @@ module.exports = async function handler(req, res) {
       "Operational Note",
     ]];
     const csvRows = planogramDetail
-      ? filterPlanogramDetailRows(buildPlanogramDetailRows(rows), {
+      ? filterPlanogramDetailRows(buildPlanogramDetailRows(rows, planogram.rules), {
         status: req.query.status,
         query: req.query.q,
       }).map((row) => planogramExportRow(row, scope, snapshot))
-      : rows.map((row) => exportRow(row, scope, snapshot));
+      : rows.map((row) => exportRow(row, scope, snapshot, planogram.rules));
     const csv = `\uFEFF${[...(planogramDetail ? planogramHeaders : headers), ...csvRows]
       .map((row) => row.map(csvValue).join(",")).join("\r\n")}`;
     const suffix = clean(req.query.table || "raw").replace(/[^a-z0-9_-]/gi, "-");
