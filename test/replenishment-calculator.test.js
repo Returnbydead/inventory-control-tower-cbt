@@ -329,3 +329,21 @@ test("UI renders replenishment quantities as whole Indonesian numbers", () => {
     "46.062",
   );
 });
+
+test("MZC2 sidebar keeps the Replenishment navigation link", () => {
+  const html = fs.readFileSync(
+    path.join(
+      __dirname,
+      "..",
+      "public",
+      "preview",
+      "mzc2-sku-rebalancing-prototype.html",
+    ),
+    "utf8",
+  );
+
+  assert.match(
+    html,
+    /href="\/replenishment"><span class="side-icon">R<\/span>Replenishment Calculator<\/a>/,
+  );
+});
