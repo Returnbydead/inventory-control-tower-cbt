@@ -8,6 +8,7 @@ const {
   calculationForParam,
   generationEnabled,
   normalizeDoiOverride,
+  normalizeExistingTasks,
   normalizePostedTasks,
   normalizeSelectedTaskKeys,
   normalizeTaskKey,
@@ -173,6 +174,92 @@ test("UI sends task keys with the active DOI override", () => {
   assert.match(html, /task_keys:\s*tasks\.map/);
   assert.match(html, /doi_override: loadedDoiOverride/);
   assert.match(html, /Gunakan DOI PARAM atau override/);
+});
+
+test("subtracts active generated quantity per SKU before using another source rack", () => {
+  const result = buildCalculator({
+    params: [param()],
+    sohRows: [storage("RACK-A", 5), storage("RACK-B", 10)],
+    existingKeys: [],
+    existingTasks: [
+      {
+        task_key: "SKU1|RACK-A",
+        sku_number: "SKU1",
+        from_rack_name: "RACK-A",
+        allocated_qty: 5,
+        status: "READY",
+      },
+    ],
+    ledgerMode: "TASKS",
+  });
+
+  assert.equal(result.ledger_ready, true);
+  assert.equal(result.summary.required_qty, 8);
+  assert.equal(result.summary.existing_allocated_qty, 5);
+  assert.equal(result.summary.remaining_required_qty, 3);
+  assert.deepEqual(
+    result.tasks.map((task) => [task.task_key, task.allocated_qty]),
+    [["SKU1|RACK-B", 3]],
+  );
+});
+
+test("a fully generated SKU has no second-run candidates", () => {
+  const existingTasks = [
+    {
+      task_key: "SKU1|RACK-A",
+      sku_number: "SKU1",
+      allocated_qty: 5,
+      status: "READY",
+    },
+    {
+      task_key: "SKU1|RACK-B",
+      sku_number: "SKU1",
+      allocated_qty: 3,
+      status: "PARTIAL",
+    },
+  ];
+  const result = buildCalculator({
+    params: [param()],
+    sohRows: [storage("RACK-A", 5), storage("RACK-B", 10)],
+    existingTasks,
+    ledgerMode: "TASKS",
+  });
+
+  assert.equal(result.summary.task_count, 0);
+  assert.equal(result.summary.existing_allocated_qty, 8);
+  assert.equal(result.summary.remaining_required_qty, 0);
+  assert.equal(result.sku_rows[0].status, "ALREADY_GENERATED");
+});
+
+test("duplicate active rows are surfaced as overgenerated and never create more candidates", () => {
+  const result = buildCalculator({
+    params: [param()],
+    sohRows: [storage("RACK-A", 5), storage("RACK-B", 10)],
+    existingTasks: [
+      { task_key: "SKU1|RACK-A", allocated_qty: 8, status: "READY" },
+      { task_key: "SKU1|RACK-B", allocated_qty: 5, status: "READY" },
+    ],
+    ledgerMode: "TASKS",
+  });
+
+  assert.equal(result.summary.existing_generated_qty, 13);
+  assert.equal(result.summary.existing_allocated_qty, 8);
+  assert.equal(result.summary.overgenerated_qty, 5);
+  assert.equal(result.summary.remaining_required_qty, 0);
+  assert.equal(result.summary.task_count, 0);
+});
+
+test("completed or cancelled ledger rows no longer reduce current demand", () => {
+  const tasks = normalizeExistingTasks([
+    { task_key: "SKU1|RACK-A", allocated_qty: 5, status: "COMPLETED" },
+    { task_key: "SKU1|RACK-B", allocated_qty: 3, status: "CANCELLED" },
+    { task_key: "SKU1|RACK-C", allocated_qty: 2, status: "READY" },
+  ]);
+
+  assert.deepEqual(
+    tasks.map((task) => [task.task_key, task.allocated_qty]),
+    [["SKU1|RACK-C", 2]],
+  );
 });
 
 test("DOI override recalculates Target PF, Need, and Task Qty on the server", () => {

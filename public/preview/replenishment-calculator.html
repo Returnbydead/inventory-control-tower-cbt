@@ -379,7 +379,7 @@
 
       .kpi-grid {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
       }
 
       .kpi {
@@ -976,9 +976,31 @@
             tone: "",
           },
           {
-            label: "Allocated Qty",
+            label: "Sudah Generated",
+            value: summary.existing_generated_qty,
+            note: "Qty task aktif di ledger",
+            tone: "safe",
+          },
+          {
+            label: "Overgenerated",
+            value: summary.overgenerated_qty,
+            note: "Task aktif melebihi required",
+            tone:
+              numberValue(summary.overgenerated_qty) > 0 ? "danger" : "safe",
+          },
+          {
+            label: "Sisa Required",
+            value: summary.remaining_required_qty,
+            note: "Required dikurangi task aktif",
+            tone:
+              numberValue(summary.remaining_required_qty) > 0
+                ? "warning"
+                : "safe",
+          },
+          {
+            label: "Candidate Allocated",
             value: summary.allocated_qty,
-            note: "Qty yang tercover source storage",
+            note: "Sisa qty yang tercover source",
             tone: "safe",
           },
           {
@@ -1022,7 +1044,7 @@
 
         byId("helper").textContent = calculatorPayload
           ? `${qty(calculatorPayload.summary?.task_count)} kandidat task · ` +
-            `${qty(calculatorPayload.summary?.skipped_existing_source_count)} source rack dilewati karena task_key sudah ada.`
+            `${qty(calculatorPayload.summary?.existing_generated_qty)} qty task aktif sudah dibaca dari ledger.`
           : "Calculator belum dimuat.";
 
         byId("taskBody").innerHTML = rows.length
@@ -1188,7 +1210,9 @@
           showMessage(
             payload.generation_enabled
               ? `Kalkulasi selesai. ${qty(payload.summary?.task_count)} task kandidat siap direview.`
-              : "Mode review aktif. Generate dikunci sementara untuk mencegah task duplikat.",
+              : payload.ledger_ready
+                ? "Mode review aktif. Generate dikunci sementara dari konfigurasi server."
+                : "Mode review aktif. Generate dikunci sampai ledger task aktif terbaca lengkap.",
             payload.generation_enabled ? "success" : "error",
           );
         } catch (error) {

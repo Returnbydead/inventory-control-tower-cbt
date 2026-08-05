@@ -308,15 +308,74 @@ function calculationForParam(param, doiOverride) {
   };
 }
 
+const INACTIVE_TASK_STATUSES = new Set([
+  "CANCELLED",
+  "CANCELED",
+  "CLOSED",
+  "COMPLETE",
+  "COMPLETED",
+  "DONE",
+]);
+
+function normalizeExistingTasks(tasks) {
+  return (Array.isArray(tasks) ? tasks : [])
+    .map((task) => {
+      const skuNumber = normalizeSku(task?.sku_number);
+      const fromRackName = normalizeRack(task?.from_rack_name);
+      const taskKey = normalizeTaskKey(
+        task?.task_key ||
+          (skuNumber && fromRackName
+            ? buildTaskKey(skuNumber, fromRackName)
+            : ""),
+      );
+      const status = clean(task?.status).toUpperCase();
+
+      return {
+        task_key: taskKey,
+        sku_number: skuNumber || normalizeSku(taskKey.split("|")[0]),
+        allocated_qty: rounded(task?.allocated_qty),
+        status,
+      };
+    })
+    .filter(
+      (task) =>
+        task.task_key &&
+        task.sku_number &&
+        task.allocated_qty > 0 &&
+        !INACTIVE_TASK_STATUSES.has(task.status),
+    );
+}
+
 /**
  * Tanpa override, Task Qty final berasal dari GSheet.
  * Dengan override, server menghitung ulang Target PF, Need, dan Task Qty.
  * MotherDuck tetap hanya membagi Task Qty ke source rack.
  */
-function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) {
+function buildCalculator({
+  params,
+  sohRows,
+  existingKeys,
+  existingTasks,
+  ledgerMode = "KEYS_ONLY",
+  doiOverride = null,
+}) {
+  const activeTasks = normalizeExistingTasks(existingTasks);
   const existingKeySet = new Set(
-    (existingKeys || []).map(normalizeTaskKey).filter(Boolean),
+    [...(existingKeys || []), ...activeTasks.map((task) => task.task_key)]
+      .map(normalizeTaskKey)
+      .filter(Boolean),
   );
+  const existingAllocatedBySku = new Map();
+
+  for (const task of activeTasks) {
+    existingAllocatedBySku.set(
+      task.sku_number,
+      rounded(
+        (existingAllocatedBySku.get(task.sku_number) || 0) +
+          task.allocated_qty,
+      ),
+    );
+  }
 
   const sohBySku = groupSohRows(sohRows);
 
@@ -326,11 +385,31 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
   let totalRequiredQty = 0;
   let totalAllocatedQty = 0;
   let totalShortageQty = 0;
+  let totalExistingAllocatedQty = 0;
+  let totalExistingGeneratedQty = 0;
+  let totalOvergeneratedQty = 0;
   let skippedExistingCount = 0;
 
   for (const param of params) {
     const calculation = calculationForParam(param, doiOverride);
     const { doi, targetPf, needQty, taskQty } = calculation;
+    const existingGeneratedQty = rounded(
+      existingAllocatedBySku.get(param.sku_number) || 0,
+    );
+    const existingAllocatedQty = rounded(
+      Math.min(taskQty, existingGeneratedQty),
+    );
+    const overgeneratedQty = rounded(
+      Math.max(0, existingGeneratedQty - taskQty),
+    );
+    const remainingRequiredQty = rounded(
+      Math.max(0, taskQty - existingAllocatedQty),
+    );
+
+    totalRequiredQty += taskQty;
+    totalExistingAllocatedQty += existingAllocatedQty;
+    totalExistingGeneratedQty += existingGeneratedQty;
+    totalOvergeneratedQty += overgeneratedQty;
 
     /**
      * Tidak ada Task Qty dari GSheet.
@@ -352,6 +431,11 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
         replenish_qty: 0,
         task_qty: 0,
 
+        existing_allocated_qty: existingAllocatedQty,
+        existing_generated_qty: existingGeneratedQty,
+        overgenerated_qty: overgeneratedQty,
+        remaining_required_qty: 0,
+
         allocated_qty: 0,
         shortage_qty: 0,
 
@@ -364,7 +448,31 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
       continue;
     }
 
-    totalRequiredQty += taskQty;
+    if (remainingRequiredQty <= 0) {
+      skuRows.push({
+        product_id: param.product_id,
+        sku_number: param.sku_number,
+        product_name: param.product_name,
+        doi,
+        max_pf: param.max_pf,
+        target_pf: targetPf,
+        pickface_stock: param.pickface,
+        storage_stock: param.storage,
+        need_qty: needQty,
+        replenish_qty: taskQty,
+        task_qty: taskQty,
+        existing_allocated_qty: existingAllocatedQty,
+        existing_generated_qty: existingGeneratedQty,
+        overgenerated_qty: overgeneratedQty,
+        remaining_required_qty: 0,
+        allocated_qty: 0,
+        shortage_qty: 0,
+        source_count: 0,
+        task_count: 0,
+        status: "ALREADY_GENERATED",
+      });
+      continue;
+    }
 
     const group = sohBySku.get(param.sku_number) || {
       sku_number: param.sku_number,
@@ -378,7 +486,7 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
      * di detail SOH MotherDuck.
      */
     if (!group.all.length) {
-      totalShortageQty += taskQty;
+      totalShortageQty += remainingRequiredQty;
 
       skuRows.push({
         product_id: param.product_id,
@@ -396,8 +504,13 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
         replenish_qty: taskQty,
         task_qty: taskQty,
 
+        existing_allocated_qty: existingAllocatedQty,
+        existing_generated_qty: existingGeneratedQty,
+        overgenerated_qty: overgeneratedQty,
+        remaining_required_qty: remainingRequiredQty,
+
         allocated_qty: 0,
-        shortage_qty: taskQty,
+        shortage_qty: remainingRequiredQty,
 
         source_count: 0,
         task_count: 0,
@@ -433,7 +546,7 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
         left.rack_name.localeCompare(right.rack_name),
     );
 
-    let remainingTaskQty = taskQty;
+    let remainingTaskQty = remainingRequiredQty;
     let allocatedSkuQty = 0;
     let sourceCount = 0;
     let taskCount = 0;
@@ -508,7 +621,9 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
       taskCount += 1;
     }
 
-    const shortageQty = rounded(Math.max(0, taskQty - allocatedSkuQty));
+    const shortageQty = rounded(
+      Math.max(0, remainingRequiredQty - allocatedSkuQty),
+    );
 
     const skuStatus =
       shortageQty > 0
@@ -544,6 +659,11 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
       replenish_qty: taskQty,
       task_qty: taskQty,
 
+      existing_allocated_qty: existingAllocatedQty,
+      existing_generated_qty: existingGeneratedQty,
+      overgenerated_qty: overgeneratedQty,
+      remaining_required_qty: remainingRequiredQty,
+
       allocated_qty: allocatedSkuQty,
       shortage_qty: shortageQty,
 
@@ -571,7 +691,9 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
 
   return {
     ok: true,
-    generation_enabled: generationEnabled(),
+    generation_enabled: generationEnabled() && ledgerMode === "TASKS",
+    ledger_mode: ledgerMode,
+    ledger_ready: ledgerMode === "TASKS",
 
     /**
      * Dipertahankan agar frontend lama tidak error.
@@ -612,6 +734,16 @@ function buildCalculator({ params, sohRows, existingKeys, doiOverride = null }) 
        * Total Task Qty dari GSheet atau hasil DOI override.
        */
       required_qty: rounded(totalRequiredQty),
+
+      existing_allocated_qty: rounded(totalExistingAllocatedQty),
+
+      existing_generated_qty: rounded(totalExistingGeneratedQty),
+
+      overgenerated_qty: rounded(totalOvergeneratedQty),
+
+      remaining_required_qty: rounded(
+        Math.max(0, totalRequiredQty - totalExistingAllocatedQty),
+      ),
 
       /**
        * Total yang berhasil dibagi ke source rack.
@@ -851,9 +983,29 @@ function selectCurrentTasks(tasks, selectedKeys) {
 }
 
 async function loadCalculatorInputs(doiOverride = null) {
-  const [paramPayload, keyPayload] = await Promise.all([
+  const [paramPayload, ledgerPayload] = await Promise.all([
     fetchGasAction("param"),
-    fetchGasAction("keys"),
+    fetchGasAction("tasks")
+      .then((payload) => {
+        if (!Array.isArray(payload.tasks)) {
+          throw new Error("GAS action=tasks belum menyediakan array tasks.");
+        }
+
+        return {
+          existingTasks: payload.tasks,
+          existingKeys: [],
+          ledgerMode: "TASKS",
+        };
+      })
+      .catch(async () => {
+        const payload = await fetchGasAction("keys");
+
+        return {
+          existingTasks: [],
+          existingKeys: Array.isArray(payload.keys) ? payload.keys : [],
+          ledgerMode: "KEYS_ONLY",
+        };
+      }),
   ]);
 
   const params = normalizeParamRows(paramPayload.rows);
@@ -862,7 +1014,7 @@ async function loadCalculatorInputs(doiOverride = null) {
   return {
     params,
     sohRows,
-    existingKeys: keyPayload.keys,
+    ...ledgerPayload,
     doiOverride,
   };
 }
@@ -890,6 +1042,15 @@ async function handlePost(req, res) {
   const selectedKeys = normalizeSelectedTaskKeys(req.body?.task_keys);
   const doiOverride = normalizeDoiOverride(req.body?.doi_override);
   const calculator = buildCalculator(await loadCalculatorInputs(doiOverride));
+
+  if (!calculator.ledger_ready) {
+    const error = new Error(
+      "Generate task tetap dikunci karena ledger GAS belum mengirim detail task aktif.",
+    );
+    error.statusCode = 423;
+    throw error;
+  }
+
   const currentTasks = selectCurrentTasks(calculator.tasks, selectedKeys);
   const tasks = normalizePostedTasks(currentTasks);
 
@@ -943,6 +1104,7 @@ module.exports._test = {
   generationEnabled,
   groupSohRows,
   normalizeDoiOverride,
+  normalizeExistingTasks,
   normalizeParamRows,
   normalizePostedTasks,
   normalizeSelectedTaskKeys,
