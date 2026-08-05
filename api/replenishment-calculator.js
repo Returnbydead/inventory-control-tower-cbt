@@ -22,6 +22,10 @@ function rounded(value) {
   return Math.round(number(value) * 1000) / 1000;
 }
 
+function wholeQty(value) {
+  return Math.round(Math.max(0, number(value)));
+}
+
 function normalizeDoiOverride(value) {
   if (value === undefined || value === null || clean(value) === "") {
     return null;
@@ -290,15 +294,19 @@ function calculationForParam(param, doiOverride) {
   if (doiOverride === null) {
     return {
       doi: rounded(param.doi),
-      targetPf: rounded(param.final_qty),
-      needQty: rounded(Math.max(0, param.task_qty)),
-      taskQty: rounded(Math.max(0, param.task_qty)),
+      targetPf: wholeQty(param.final_qty),
+      needQty: wholeQty(param.task_qty),
+      taskQty: wholeQty(param.task_qty),
     };
   }
 
-  const targetPf = rounded(Math.max(0, param.max_pf) * doiOverride);
-  const needQty = rounded(Math.max(0, targetPf - param.pickface));
-  const taskQty = rounded(Math.min(Math.max(0, param.storage), needQty));
+  const rawTargetPf = Math.max(0, param.max_pf) * doiOverride;
+  const rawNeedQty = Math.max(0, rawTargetPf - param.pickface);
+  const targetPf = wholeQty(rawTargetPf);
+  const needQty = wholeQty(rawNeedQty);
+  const taskQty = wholeQty(
+    Math.min(Math.max(0, param.storage), rawNeedQty),
+  );
 
   return {
     doi: doiOverride,

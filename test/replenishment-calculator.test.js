@@ -344,6 +344,36 @@ test("DOI override caps Task Qty at GSheet Storage and rejects invalid DOI", () 
   assert.throws(() => normalizeDoiOverride(0), /lebih dari 0/);
 });
 
+test("rounds operational task quantities per SKU before ledger reconciliation", () => {
+  const result = buildCalculator({
+    params: [
+      param({
+        max_pf: 100.25,
+        pickface: 50,
+        storage: 500,
+      }),
+    ],
+    sohRows: [storage("RACK-A", 251)],
+    existingTasks: [
+      {
+        task_key: "SKU1|RACK-A",
+        allocated_qty: 251,
+        status: "READY",
+      },
+    ],
+    ledgerMode: "TASKS",
+    doiOverride: 3,
+  });
+
+  assert.equal(result.sku_rows[0].target_pf, 301);
+  assert.equal(result.sku_rows[0].task_qty, 251);
+  assert.equal(result.summary.required_qty, 251);
+  assert.equal(result.summary.existing_generated_qty, 251);
+  assert.equal(result.summary.overgenerated_qty, 0);
+  assert.equal(result.summary.task_count, 0);
+  assert.equal(result.ledger_safe, true);
+});
+
 test("task generation stays locked unless explicitly enabled", () => {
   const previous = process.env.REPLENISHMENT_GENERATION_ENABLED;
 
