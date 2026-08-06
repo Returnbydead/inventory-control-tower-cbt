@@ -4,6 +4,14 @@ const {
   filterPlanogramDetailRows,
 } = require("../lib/planogram-detail");
 const { fetchLivePlanogramRules } = require("../lib/planogram-live");
+const {
+  annotatePlanogramRows,
+  fetchPlanogramTaskLedger,
+  normalizeSelectedTaskKeys,
+  postPlanogramTasks,
+  selectCurrentTasks,
+  toPostedPlanogramTask,
+} = require("../lib/planogram-tasks");
 
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
@@ -27,19 +35,7 @@ function limitValue(value) {
   return Number.isFinite(parsed) ? Math.max(1, Math.min(500, Math.trunc(parsed))) : 500;
 }
 
-module.exports = async function handler(req, res) {
-  if (req.method !== "GET") {
-    res.setHeader("Allow", "GET");
-    return res.status(405).json({ ok: false, message: "Method not allowed" });
-  }
-
-  let zones;
-  try {
-    zones = selectedZones(req.query.zones || req.query.zone);
-  } catch (error) {
-    return res.status(400).json({ ok: false, message: error.message });
-  }
-
+async function loadPlanogramRows(zones) {
   let client;
   try {
     const planogram = await fetchLivePlanogramRules();
@@ -60,42 +56,88 @@ module.exports = async function handler(req, res) {
         l1_category_name, l2_category_name
     `, [zones.includes(ALL_ZONES) ? ALL_ZONES : "", zones]);
 
-    const allRows = buildPlanogramDetailRows(result.rows, planogram.rules);
-    const filtered = filterPlanogramDetailRows(allRows, {
-      status: req.query.status,
-      query: req.query.q,
-    }).sort((left, right) => (
-      (left.status === "WRONG_L1" ? -1 : 1) - (right.status === "WRONG_L1" ? -1 : 1)
-      || right.wrong_value - left.wrong_value
-      || right.stock - left.stock
-      || left.rack_name.localeCompare(right.rack_name)
-      || left.sku_number.localeCompare(right.sku_number)
-    ));
     const snapshotAt = result.rows.reduce((latest, row) => {
       const value = row.snapshot_at ? new Date(row.snapshot_at).toISOString() : null;
       return value && (!latest || value > latest) ? value : latest;
     }, null);
-    const limit = limitValue(req.query.limit);
-
-    res.setHeader("Cache-Control", "no-store");
-    return res.status(200).json({
-      ok: true,
-      zones,
-      snapshot_at: snapshotAt,
-      planogram_source: planogram.source,
-      planogram_rule_count: planogram.rule_count,
-      grain: "1 row = 1 SKU x occupied location",
-      total: filtered.length,
-      limit,
-      truncated: filtered.length > limit,
-      rows: filtered.slice(0, limit),
-    });
-  } catch (error) {
-    console.error("Planogram detail query failed", { zones, message: error.message });
-    return res.status(500).json({ ok: false, message: "Planogram detail query failed" });
+    return {
+      rows: buildPlanogramDetailRows(result.rows, planogram.rules),
+      snapshotAt,
+      planogram,
+    };
   } finally {
     client?.release();
   }
+}
+
+function sortRows(rows) {
+  return rows.sort((left, right) => (
+    (left.status === "WRONG_L1" ? -1 : 1) - (right.status === "WRONG_L1" ? -1 : 1)
+    || right.wrong_value - left.wrong_value
+    || right.stock - left.stock
+    || left.rack_name.localeCompare(right.rack_name)
+    || left.sku_number.localeCompare(right.sku_number)
+  ));
+}
+
+async function handleGet(req, res) {
+  const zones = selectedZones(req.query.zones || req.query.zone);
+  const loaded = await loadPlanogramRows(zones);
+  const ledger = await fetchPlanogramTaskLedger();
+  const filtered = sortRows(filterPlanogramDetailRows(loaded.rows, {
+    status: req.query.status,
+    query: req.query.q,
+  }));
+  const annotated = annotatePlanogramRows(filtered, ledger.keys);
+  const limit = limitValue(req.query.limit);
+
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(200).json({
+    ok: true,
+    zones,
+    snapshot_at: loaded.snapshotAt,
+    planogram_source: loaded.planogram.source,
+    planogram_rule_count: loaded.planogram.rule_count,
+    planogram_task_count: ledger.tasks.length,
+    candidate_task_count: annotated.filter((row) => row.task_eligible).length,
+    grain: "1 row = 1 SKU x occupied location",
+    total: annotated.length,
+    limit,
+    truncated: annotated.length > limit,
+    rows: annotated.slice(0, limit),
+  });
+}
+
+async function handlePost(req, res) {
+  const selectedKeys = normalizeSelectedTaskKeys(req.body?.task_keys);
+  const loaded = await loadPlanogramRows([ALL_ZONES]);
+  const ledger = await fetchPlanogramTaskLedger();
+  const current = annotatePlanogramRows(loaded.rows, ledger.keys);
+  const selected = selectCurrentTasks(current, selectedKeys);
+  const result = await postPlanogramTasks(selected.map(toPostedPlanogramTask));
+
+  res.setHeader("Cache-Control", "no-store");
+  return res.status(200).json({
+    ok: true,
+    inserted: Number(result.inserted) || 0,
+    skipped: Number(result.skipped) || 0,
+    skipped_rows: Array.isArray(result.skipped_rows) ? result.skipped_rows : [],
+  });
+}
+
+module.exports = async function handler(req, res) {
+  try {
+    if (req.method === "GET") return await handleGet(req, res);
+    if (req.method === "POST") return await handlePost(req, res);
+    res.setHeader("Allow", "GET, POST");
+    return res.status(405).json({ ok: false, message: "Method not allowed" });
+  } catch (error) {
+    console.error("Planogram detail failed", { method: req.method, message: error.message });
+    return res.status(Number(error.statusCode) || 500).json({
+      ok: false,
+      message: Number(error.statusCode) ? error.message : "Planogram detail gagal diproses",
+    });
+  }
 };
 
-module.exports._test = { limitValue, selectedZones };
+module.exports._test = { limitValue, selectedZones, sortRows };

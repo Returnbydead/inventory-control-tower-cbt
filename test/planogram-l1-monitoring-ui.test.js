@@ -68,6 +68,10 @@ test("planogram renders all-zone operational details without the retired priorit
     'id="downloadDetail"',
     "planogram-sku-location",
     "1 SKU × occupied location",
+    "generatePlanogramTasks",
+    "selectAllPlanogramTasks",
+    "PLANOGRAM TASK",
+    "task_keys: taskKeys",
   ]) assert.ok(html.includes(marker), `${marker} is missing`);
   assert.ok(!html.includes('id="priority-rack"'), "retired priority rack panel is still present");
   assert.ok(!html.includes("compatibleRackIndex"), "retired rack-only suggestion engine is still present");

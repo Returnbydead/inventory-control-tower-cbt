@@ -44,6 +44,7 @@
     .crumb strong { color: var(--ink); }
     .top-actions { display: flex; align-items: center; gap: var(--space-sm); }
     .button { padding-inline: var(--space-md); }
+    .button.primary { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); font-weight: 700; }
     .icon-button { width: var(--control-height); padding: 0; }
     .freshness { color: var(--accent-strong); font-weight: 700; font-size: var(--text-sm); white-space: nowrap; }
     .freshness::before { content: ""; display: inline-block; width: .55rem; height: .55rem; margin-inline-end: var(--space-xs); border-radius: 50%; background: currentColor; }
@@ -107,6 +108,13 @@
     .split-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-md); }
     .toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-sm); padding: var(--space-sm) var(--space-lg); border-block-end: 1px solid var(--rule); color: var(--ink-2); font-size: var(--text-sm); }
     .toolbar strong { color: var(--ink); white-space: nowrap; }
+    .task-toolbar { display: flex; align-items: center; gap: var(--space-md); min-width: 0; }
+    .task-select { display: inline-flex; align-items: center; gap: var(--space-xs); color: var(--ink); white-space: nowrap; }
+    .task-select input, .task-checkbox { width: 1rem; height: 1rem; min-height: 0; accent-color: var(--accent); }
+    .task-message { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .task-state { color: var(--ink-2); font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 700; white-space: nowrap; }
+    .task-state.ready { color: var(--safe); }
+    .task-state.generated { color: var(--accent-strong); }
     .table-shell { width: 100%; max-height: 31rem; overflow: auto; }
     .table-shell.tall { max-height: 38rem; }
     table { width: 100%; min-width: 45rem; border-collapse: collapse; font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
@@ -167,7 +175,7 @@
 
         <section class="section" id="aisle-accuracy"><header class="section-heading"><h2>L1 Accuracy by Aisle</h2><span>Prioritas aisle dengan salah L1 terbanyak</span></header><div class="table-shell"><table><thead><tr><th class="left">Aisle</th><th>Occupied SLOC</th><th>Correct</th><th>Wrong L1</th><th>Wrong Qty</th><th>Accuracy</th></tr></thead><tbody id="aisleBody"></tbody></table></div></section>
 
-        <section class="section" id="l1-detail"><header class="section-heading"><h2>L1 Detail per SKU &amp; Lokasi</h2><div class="section-actions"><span>Raw SOH dibanding target placement rules</span><button class="button" id="downloadDetail" type="button" disabled>Download CSV</button></div></header><div class="toolbar"><span>1 row = 1 SKU × occupied location · beberapa saran zona/aisle ditampilkan, cek kapasitas rack dulu</span><strong id="detailCount">Memuat detail…</strong></div><div class="table-shell tall"><table style="min-width: 112rem"><thead><tr><th class="left">SKU / Produk</th><th class="left">Current Rack</th><th>Zone</th><th>Aisle</th><th>Sequence</th><th>Level</th><th class="left">Current L1</th><th>Quantity</th><th>Wrong Qty</th><th>Value Risk</th><th class="left">Target di Lokasi Saat Ini</th><th class="left">Saran Placement</th><th class="left">Dasar Saran</th><th>Status</th></tr></thead><tbody id="detailBody"><tr><td class="empty" colspan="14">Memuat detail SKU per lokasi…</td></tr></tbody></table></div></section>
+        <section class="section" id="l1-detail"><header class="section-heading"><h2>L1 Detail per SKU &amp; Lokasi</h2><div class="section-actions"><span>1 SKU × occupied location · task masuk ke ledger PLANOGRAM TASK</span><button class="button" id="downloadDetail" type="button" disabled>Download CSV</button><button class="button primary" id="generatePlanogramTasks" type="button" disabled>Generate Task Terpilih</button></div></header><div class="toolbar"><div class="task-toolbar"><label class="task-select"><input id="selectAllPlanogramTasks" type="checkbox" disabled>Pilih semua kandidat yang tampil</label><span class="task-message" id="taskMessage">Memuat kandidat task…</span></div><strong id="detailCount">Memuat detail…</strong></div><div class="table-shell tall"><table style="min-width: 120rem"><thead><tr><th>Pilih</th><th class="left">SKU / Produk</th><th class="left">Current Rack</th><th>Zone</th><th>Aisle</th><th>Sequence</th><th>Level</th><th class="left">Current L1</th><th>Quantity</th><th>Wrong Qty</th><th>Value Risk</th><th class="left">Target di Lokasi Saat Ini</th><th class="left">Saran Placement</th><th class="left">Dasar Saran</th><th>Status L1</th><th>Task</th></tr></thead><tbody id="detailBody"><tr><td class="empty" colspan="16">Memuat detail SKU per lokasi…</td></tr></tbody></table></div></section>
       </div>
     </main>
   </div>
@@ -190,6 +198,7 @@
     let detailPayload = null;
     let zones = [];
     let allZoneSummaries = [];
+    const selectedPlanogramTaskKeys = new Set();
     const selectedZoneValues = () => [...document.querySelectorAll('#zoneOptions input:checked')].map(input => input.value);
     function updateZonePickerSummary() { const selected = selectedZoneValues(); $('#zonePickerSummary').textContent = selected.includes('ALL') ? 'Semua zona' : selected.length === 1 ? selected[0] : selected.length ? `${selected.length} zona dipilih` : 'Pilih zona'; }
     function setSelectedZones(values) { const wanted = new Set(values); document.querySelectorAll('#zoneOptions input').forEach(input => { input.checked = wanted.has(input.value); }); updateZonePickerSummary(); }
@@ -209,12 +218,32 @@
       if (!items.length) return '—';
       return `<div class="suggestion-list">${items.map(item => `<div class="suggestion-item">${key === 'label' ? `<strong>${escapeHtml(item.label)}</strong>` : `<span>${escapeHtml(item.reason)}</span>`}</div>`).join('')}</div>`;
     }
+    function taskState(row) {
+      if (row.task_status === 'GENERATED') return '<span class="task-state generated">GENERATED</span>';
+      if (row.task_eligible) return '<span class="task-state ready">READY</span>';
+      return '<span class="task-state">—</span>';
+    }
+    function updatePlanogramTaskControls(rows = detailPayload?.rows || []) {
+      const candidates = rows.filter(row => row.task_eligible);
+      const visibleKeys = new Set(candidates.map(row => row.task_key));
+      for (const key of [...selectedPlanogramTaskKeys]) if (!visibleKeys.has(key)) selectedPlanogramTaskKeys.delete(key);
+      const selectedCount = selectedPlanogramTaskKeys.size;
+      const generatedCount = rows.filter(row => row.task_status === 'GENERATED').length;
+      const selectAll = $('#selectAllPlanogramTasks');
+      selectAll.disabled = !candidates.length;
+      selectAll.checked = candidates.length > 0 && candidates.every(row => selectedPlanogramTaskKeys.has(row.task_key));
+      selectAll.indeterminate = selectedCount > 0 && !selectAll.checked;
+      $('#generatePlanogramTasks').disabled = selectedCount === 0;
+      $('#generatePlanogramTasks').textContent = selectedCount ? `Generate ${integer.format(selectedCount)} Task` : 'Generate Task Terpilih';
+      $('#taskMessage').textContent = `${integer.format(candidates.length)} kandidat siap · ${integer.format(generatedCount)} sudah generated`;
+    }
     function renderDetails(data) {
       detailPayload = data;
       const rows = data?.rows || [];
       $('#detailCount').textContent = data?.truncated ? `${integer.format(rows.length)} dari ${integer.format(data.total)} records · prioritas di atas` : `${integer.format(data?.total || 0)} records`;
       $('#downloadDetail').disabled = !data?.ok;
       tableBody('#detailBody', rows, [
+        { value: row => `<input class="task-checkbox" type="checkbox" data-task-key="${escapeHtml(row.task_key)}" aria-label="Pilih task ${escapeHtml(row.sku_number)} dari ${escapeHtml(row.rack_name)}" ${row.task_eligible ? '' : 'disabled'} ${selectedPlanogramTaskKeys.has(row.task_key) ? 'checked' : ''}>` },
         { left: true, value: row => `<div class="sku-cell"><strong>${escapeHtml(row.sku_number || '—')}</strong><span>${escapeHtml(row.product_name || 'Produk belum terhubung')}</span></div>` },
         { left: true, value: row => escapeHtml(row.rack_name) },
         { value: row => escapeHtml(row.zone || '—') },
@@ -229,12 +258,17 @@
         { left: true, value: row => suggestionCell(row, 'label') },
         { left: true, value: row => suggestionCell(row, 'reason') },
         { value: row => statusChip(row.status) },
+        { value: row => taskState(row) },
       ], 'Tidak ada detail SKU × lokasi untuk filter ini.');
+      updatePlanogramTaskControls(rows);
     }
     async function loadDetailData(selected) {
       $('#downloadDetail').disabled = true;
+      $('#generatePlanogramTasks').disabled = true;
+      $('#selectAllPlanogramTasks').disabled = true;
+      $('#taskMessage').textContent = 'Memuat kandidat task…';
       $('#detailCount').textContent = 'Memuat detail…';
-      $('#detailBody').innerHTML = '<tr><td class="empty" colspan="14">Memuat detail SKU per lokasi…</td></tr>';
+      $('#detailBody').innerHTML = '<tr><td class="empty" colspan="16">Memuat detail SKU per lokasi…</td></tr>';
       try {
         const response = await fetch(planogramDetailUrl(selected), { cache: 'no-store' });
         const data = await response.json();
@@ -243,7 +277,8 @@
       } catch (error) {
         detailPayload = null;
         $('#detailCount').textContent = 'Detail unavailable';
-        $('#detailBody').innerHTML = `<tr><td class="empty" colspan="14">${escapeHtml(error.message)}</td></tr>`;
+        $('#taskMessage').textContent = 'Generate task unavailable';
+        $('#detailBody').innerHTML = `<tr><td class="empty" colspan="16">${escapeHtml(error.message)}</td></tr>`;
       }
     }
     function downloadDetailCsv() {
@@ -252,6 +287,29 @@
       params.set('table', 'planogram-sku-location');
       params.delete('limit');
       window.location.assign(`${previewApiOrigin}/api/occupancy-export?${params}`);
+    }
+    async function generateSelectedPlanogramTasks() {
+      const taskKeys = [...selectedPlanogramTaskKeys];
+      if (!taskKeys.length || !confirm(`Generate ${taskKeys.length} task Planogram ke Google Sheets?`)) return;
+      const button = $('#generatePlanogramTasks');
+      button.disabled = true;
+      $('#selectAllPlanogramTasks').disabled = true;
+      $('#taskMessage').textContent = 'Mengirim task ke Google Sheets…';
+      try {
+        const response = await fetch(`${previewApiOrigin}/api/planogram-detail`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ task_keys: taskKeys }),
+        });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.message || `Generate gagal: HTTP ${response.status}`);
+        selectedPlanogramTaskKeys.clear();
+        await loadDetailData(selectedZoneValues());
+        $('#taskMessage').textContent = `${integer.format(data.inserted)} task berhasil dibuat · ${integer.format(data.skipped)} dilewati`;
+      } catch (error) {
+        $('#taskMessage').textContent = error.message;
+        updatePlanogramTaskControls();
+      }
     }
     function render() {
       if (!payload?.locations) {
@@ -263,7 +321,7 @@
           { key: 'gap', label: 'No Target', value: total.noTarget, note: 'Tidak masuk denominator accuracy', metrics: [['Occupied', total.noTarget], ['No Target Qty', total.no_target_qty], ['Action', 'Map rule']] },
         ].map(card => `<article class="status-card ${card.key}"><div class="label"><span>${card.label}</span><small>${card.note}</small></div><strong>${integer.format(card.value)}</strong><div class="metric-strip">${card.metrics.map(([label, value]) => `<span>${label}<b>${typeof value === 'number' ? integer.format(value) : value}</b></span>`).join('')}</div></article>`).join('');
         $('#aisleBody').innerHTML = '<tr><td class="empty" colspan="6">Data aisle belum tersedia pada snapshot ini.</td></tr>';
-        $('#detailCount').textContent = '0 records'; $('#detailBody').innerHTML = '<tr><td class="empty" colspan="14">Data detail SKU belum tersedia pada snapshot ini.</td></tr>';
+        $('#detailCount').textContent = '0 records'; $('#taskMessage').textContent = '0 kandidat siap'; $('#detailBody').innerHTML = '<tr><td class="empty" colspan="16">Data detail SKU belum tersedia pada snapshot ini.</td></tr>';
         return;
       }
       const rows = filteredLocations(); const total = summary(rows); const mapped = total.compliant + total.wrong;
@@ -342,7 +400,7 @@
     async function loadAllZoneAccuracy(selected = selectedZoneValues(), data = payload) { const setReport = source => { const summaries = source.zone_summaries || {}; const reportZones = selected.includes('ALL') ? Object.keys(summaries) : selected; allZoneSummaries = reportZones.map(zone => ({ zone, ...uiSummary(summaries[zone]) })).sort((a, b) => a.zone.localeCompare(b.zone)); $('#allZoneMessage').innerHTML = `<strong>${integer.format(allZoneSummaries.length)} zona</strong> · % SLOC dan % Quantity dihitung hanya dari SLOC yang memiliki target L1.`; renderAllZoneAccuracy(); }; if (data?.zone_summaries) { setReport(data); return; } const activeZone = selected[0]; allZoneSummaries = [{ zone: activeZone, ...uiSummary(data?.summary) }]; $('#allZoneMessage').innerHTML = `<strong>${escapeHtml(activeZone)}</strong> · report mengikuti zona yang dipilih.`; renderAllZoneAccuracy(); }
     function resetFilter() { $('#statusFilter').value = ''; $('#searchFilter').value = ''; setSelectedZones(['ALL']); loadData(); }
     $('#navToggle').addEventListener('click', () => { const collapsed = document.body.classList.toggle('nav-collapsed'); $('#navToggle').setAttribute('aria-expanded', String(!collapsed)); });
-    $('#applyFilter').addEventListener('click', loadData); $('#resetFilter').addEventListener('click', resetFilter); $('#refresh').addEventListener('click', loadData); $('#downloadDetail').addEventListener('click', downloadDetailCsv); $('#selectAllZones').addEventListener('click', () => setSelectedZones(['ALL'])); $('#clearZones').addEventListener('click', () => setSelectedZones([])); $('#zoneOptions').addEventListener('change', event => { const changed = event.target; if (!changed.matches('input')) return; if (changed.value === 'ALL' && changed.checked) setSelectedZones(['ALL']); else if (changed.value !== 'ALL') { const checked = selectedZoneValues().filter(value => value !== 'ALL'); setSelectedZones(checked); } else updateZonePickerSummary(); }); $('#searchFilter').addEventListener('keydown', event => { if (event.key === 'Enter') loadData(); });
+    $('#applyFilter').addEventListener('click', loadData); $('#resetFilter').addEventListener('click', resetFilter); $('#refresh').addEventListener('click', loadData); $('#downloadDetail').addEventListener('click', downloadDetailCsv); $('#generatePlanogramTasks').addEventListener('click', generateSelectedPlanogramTasks); $('#selectAllPlanogramTasks').addEventListener('change', event => { const candidates = (detailPayload?.rows || []).filter(row => row.task_eligible); for (const row of candidates) { if (event.target.checked) selectedPlanogramTaskKeys.add(row.task_key); else selectedPlanogramTaskKeys.delete(row.task_key); } renderDetails(detailPayload); }); $('#detailBody').addEventListener('change', event => { const checkbox = event.target.closest('.task-checkbox'); if (!checkbox) return; if (checkbox.checked) selectedPlanogramTaskKeys.add(checkbox.dataset.taskKey); else selectedPlanogramTaskKeys.delete(checkbox.dataset.taskKey); updatePlanogramTaskControls(); }); $('#selectAllZones').addEventListener('click', () => setSelectedZones(['ALL'])); $('#clearZones').addEventListener('click', () => setSelectedZones([])); $('#zoneOptions').addEventListener('change', event => { const changed = event.target; if (!changed.matches('input')) return; if (changed.value === 'ALL' && changed.checked) setSelectedZones(['ALL']); else if (changed.value !== 'ALL') { const checked = selectedZoneValues().filter(value => value !== 'ALL'); setSelectedZones(checked); } else updateZonePickerSummary(); }); $('#searchFilter').addEventListener('keydown', event => { if (event.key === 'Enter') loadData(); });
     (async () => { try { await loadRules(); await loadData(); } catch (error) { $('.dashboard').innerHTML = `<section class="error"><strong>Preview belum bisa disiapkan.</strong>${escapeHtml(error.message)}</section>`; } })();
   </script>
 </body>

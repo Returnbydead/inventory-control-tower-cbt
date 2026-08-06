@@ -33,7 +33,7 @@
       "maxDuration": 60
     },
     "api/planogram-detail.js": {
-      "maxDuration": 60
+      "maxDuration": 300
     },
     "api/sync-putaway.js": {
       "maxDuration": 300
