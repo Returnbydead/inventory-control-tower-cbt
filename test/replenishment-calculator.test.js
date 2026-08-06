@@ -109,7 +109,11 @@ test("Replenishment suggestion always follows the GSheet planogram range", () =>
   });
 
   assert.equal(result.tasks[0].suggested_zone, "SRA1");
-  assert.equal(result.tasks[0].suggested_aisle, "01-08");
+  assert.equal(result.tasks[0].suggested_aisle, 1);
+  assert.equal(
+    result.tasks[0].suggestion_options,
+    "SRA1 - aisle 01 | SRA1 - aisle 02 | SRA1 - aisle 03 | SRA1 - aisle 04",
+  );
   assert.equal(result.tasks[0].suggested_rack_name, "");
   assert.equal(result.tasks[0].suggestion_basis, "PLANOGRAM_GSHEET");
 });
@@ -132,9 +136,38 @@ test("Replenishment suggestion uses the live Planogram payload", () => {
   });
 
   assert.equal(result.tasks[0].suggested_zone, "SRB1");
-  assert.equal(result.tasks[0].suggested_aisle, "19-20");
+  assert.equal(result.tasks[0].suggested_aisle, 19);
+  assert.equal(result.tasks[0].suggestion_options, "SRB1 - aisle 19 | SRB1 - aisle 20");
   assert.equal(result.planogram_source, "GSHEET_LIVE");
   assert.equal(result.planogram_rule_count, 1);
+});
+
+test("Replenishment suggestion prioritizes an existing SKU aisle and keeps cross-zone options", () => {
+  const result = buildCalculator({
+    params: [param()],
+    sohRows: [
+      storage("CBT-SRB1-20-01-L1-01", 30, {
+        remarks_zone: "PICKFACE",
+        zone: "SRB1",
+        aisle: "20",
+        rack_level: "L1",
+        l1_category_name: "Minuman",
+      }),
+      storage("CBT-SRA1-01-01-L2-01", 8, { l1_category_name: "Minuman" }),
+    ],
+    existingKeys: [],
+    planogramRules: [
+      { category: "Minuman", zone: "SRA1", aisle_from: 1, aisle_to: 2, source: "GSHEET_LIVE" },
+      { category: "Minuman", zone: "SRB1", aisle_from: 19, aisle_to: 20, source: "GSHEET_LIVE" },
+    ],
+  });
+
+  assert.equal(result.tasks[0].suggested_zone, "SRB1");
+  assert.equal(result.tasks[0].suggested_aisle, 20);
+  assert.equal(
+    result.tasks[0].suggestion_options,
+    "SRB1 - aisle 20 | SRA1 - aisle 01 | SRA1 - aisle 02 | SRB1 - aisle 19",
+  );
 });
 
 test("normalizes existing task keys and emits one candidate per source rack", () => {
@@ -198,11 +231,13 @@ test("server-generated GAS payload preserves task and destination rack keys", ()
       source_stock: 5,
       allocated_qty: 5,
       replenish_qty: 8,
+      suggestion_options: "SRC1 - aisle 14 | SRC1 - aisle 13",
       suggested_rack_name: "cbt-pf-01",
     },
   ]);
 
   assert.equal(task.task_key, "SKU1|RACK-A");
+  assert.equal(task.suggestion_options, "SRC1 - aisle 14 | SRC1 - aisle 13");
   assert.equal(task.suggested_rack_name, "CBT-PF-01");
 });
 

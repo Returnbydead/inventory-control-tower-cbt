@@ -1,5 +1,5 @@
 const { databaseName, getPool } = require("./sync-soh")._internal;
-const { placementRangesForCategory } = require("../lib/l1-placement");
+const { placementAreasForCategory } = require("../lib/l1-placement");
 const { fetchLivePlanogramRules } = require("../lib/planogram-live");
 
 const SOURCE_ZONES = new Set(["SRA1", "SRB1", "SRC1"]);
@@ -303,18 +303,56 @@ function suggestionFor(group, planogramRules) {
     .map((row) => clean(row.l1_category_name))
     .find(Boolean);
 
-  const area = category
-    ? placementRangesForCategory(category, planogramRules)[0]
-    : null;
+  const skuQtyByArea = new Map();
+  for (const row of group.all || []) {
+    const zone = clean(row.zone).toUpperCase();
+    const aisle = Math.trunc(number(row.aisle));
+    if (!zone || aisle <= 0) continue;
+    const key = `${zone}|${aisle}`;
+    skuQtyByArea.set(key, rounded((skuQtyByArea.get(key) || 0) + row.stock));
+  }
+
+  const candidates = category
+    ? placementAreasForCategory(category, planogramRules).map((area) => ({
+      ...area,
+      sku_qty: skuQtyByArea.get(`${clean(area.zone).toUpperCase()}|${area.aisle}`) || 0,
+    })).sort((left, right) => (
+      right.sku_qty - left.sku_qty
+      || left.zone.localeCompare(right.zone)
+      || left.aisle - right.aisle
+    ))
+    : [];
+
+  // Keep cross-zone choices visible like the Planogram detail engine: start
+  // with the strongest aisle from each zone, then fill up to four options.
+  const picked = [];
+  const pickedZones = new Set();
+  for (const candidate of candidates) {
+    if (pickedZones.has(candidate.zone)) continue;
+    picked.push(candidate);
+    pickedZones.add(candidate.zone);
+    if (picked.length >= 4) break;
+  }
+  for (const candidate of candidates) {
+    if (picked.length >= 4) break;
+    if (!picked.includes(candidate)) picked.push(candidate);
+  }
+
+  const primary = picked[0] || null;
+  const suggestionOptions = picked
+    .map((area) => `${area.zone} - aisle ${String(area.aisle).padStart(2, "0")}`)
+    .join(" | ");
 
   return {
-    suggested_zone: clean(area?.zone),
+    suggested_zone: clean(primary?.zone),
 
-    suggested_aisle: clean(area?.aisle_label),
+    suggested_aisle: primary ? Math.trunc(number(primary.aisle)) : "",
+
+    suggestion_options: suggestionOptions,
 
     suggested_rack_name: "",
 
-    suggestion_basis: area ? "PLANOGRAM_GSHEET" : "NO_DESTINATION_SUGGESTION",
+    suggestion_basis: primary ? "PLANOGRAM_GSHEET" : "NO_DESTINATION_SUGGESTION",
   };
 }
 
@@ -648,6 +686,7 @@ function buildCalculator({
 
         suggested_zone: suggestion.suggested_zone,
         suggested_aisle: suggestion.suggested_aisle,
+        suggestion_options: suggestion.suggestion_options,
         suggested_rack_name: suggestion.suggested_rack_name,
 
         suggestion_basis: suggestion.suggestion_basis,
@@ -957,6 +996,8 @@ function normalizePostedTasks(tasks) {
       suggested_zone: clean(task.suggested_zone),
 
       suggested_aisle: clean(task.suggested_aisle),
+
+      suggestion_options: clean(task.suggestion_options),
 
       suggested_rack_name: normalizeRack(task.suggested_rack_name),
 
