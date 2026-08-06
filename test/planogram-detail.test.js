@@ -5,7 +5,7 @@ const {
   buildPlanogramDetailRows,
   filterPlanogramDetailRows,
 } = require("../lib/planogram-detail");
-const { limitValue, selectedZones } = require("../api/planogram-detail")._test;
+const { limitValue, selectedZones, sortRows } = require("../api/planogram-detail")._test;
 
 function row(overrides = {}) {
   return {
@@ -56,4 +56,12 @@ test("planogram detail API parameters and client filters stay bounded", () => {
   assert.equal(limitValue("900"), 500);
   const filtered = filterPlanogramDetailRows(buildPlanogramDetailRows([row()]), { query: "Minuman Uji", status: "WRONG_L1" });
   assert.equal(filtered.length, 1);
+});
+
+test("ready Planogram tasks stay above generated rows across 500-row batches", () => {
+  const sorted = sortRows([
+    { task_eligible: false, status: "WRONG_L1", wrong_value: 999, stock: 10, rack_name: "A", sku_number: "1" },
+    { task_eligible: true, status: "WRONG_L1", wrong_value: 1, stock: 1, rack_name: "B", sku_number: "2" },
+  ]);
+  assert.equal(sorted[0].task_eligible, true);
 });

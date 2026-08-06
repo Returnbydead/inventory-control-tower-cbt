@@ -72,7 +72,8 @@ async function loadPlanogramRows(zones) {
 
 function sortRows(rows) {
   return rows.sort((left, right) => (
-    (left.status === "WRONG_L1" ? -1 : 1) - (right.status === "WRONG_L1" ? -1 : 1)
+    Number(Boolean(right.task_eligible)) - Number(Boolean(left.task_eligible))
+    || (left.status === "WRONG_L1" ? -1 : 1) - (right.status === "WRONG_L1" ? -1 : 1)
     || right.wrong_value - left.wrong_value
     || right.stock - left.stock
     || left.rack_name.localeCompare(right.rack_name)
@@ -84,11 +85,11 @@ async function handleGet(req, res) {
   const zones = selectedZones(req.query.zones || req.query.zone);
   const loaded = await loadPlanogramRows(zones);
   const ledger = await fetchPlanogramTaskLedger();
-  const filtered = sortRows(filterPlanogramDetailRows(loaded.rows, {
+  const filtered = filterPlanogramDetailRows(loaded.rows, {
     status: req.query.status,
     query: req.query.q,
-  }));
-  const annotated = annotatePlanogramRows(filtered, ledger.keys);
+  });
+  const annotated = sortRows(annotatePlanogramRows(filtered, ledger.keys));
   const limit = limitValue(req.query.limit);
 
   res.setHeader("Cache-Control", "no-store");
