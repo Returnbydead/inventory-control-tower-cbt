@@ -37,18 +37,65 @@ test("planogram detail keeps one row per SKU and occupied location", () => {
   assert.equal(wrong.status, "WRONG_L1");
 });
 
-test("wrong Minuman SKU receives suggestions only from the GSheet range", () => {
+test("wrong Minuman SKU receives the exact live GSheet ranges in sheet order", () => {
+  const liveRules = [
+    {
+      category: "Minuman",
+      zone: "SRA1",
+      aisle_from: 1,
+      aisle_to: 8,
+      aisle_label: "01-08",
+      source: "GSHEET_LIVE",
+    },
+    {
+      category: "Minuman",
+      zone: "MZD1",
+      aisle_from: 1,
+      aisle_to: 36,
+      aisle_label: "01-36",
+      source: "GSHEET_LIVE",
+    },
+    {
+      category: "Snack",
+      zone: "SRA1",
+      aisle_from: 9,
+      aisle_to: 10,
+      aisle_label: "09-10",
+      source: "GSHEET_LIVE",
+    },
+  ];
   const rows = buildPlanogramDetailRows([
     row(),
     row({ rack_name: "CBT-SRA1-02-01-L1-01", aisle: "02", stock: 40 }),
     row({ sku_number: "899000000100", rack_name: "CBT-SRA1-04-01-L1-01", aisle: "04", stock: 200 }),
-  ]);
+  ], liveRules);
   const wrong = rows.find((item) => item.status === "WRONG_L1");
   assert.ok(wrong);
-  const labels = wrong.suggestions.map((item) => item.label);
-  assert.ok(labels.includes("SRA1 · aisle 02"));
-  assert.ok(labels.every((label) => label.startsWith("SRA1 · aisle 0")));
-  assert.match(wrong.suggestions.find((item) => item.label === "SRA1 · aisle 02").reason, /Teman SKU/);
+  assert.deepEqual(
+    wrong.suggestions.map(({ zone, aisle_from, aisle_to, label, reason }) => ({
+      zone,
+      aisle_from,
+      aisle_to,
+      label,
+      reason,
+    })),
+    [
+      {
+        zone: "SRA1",
+        aisle_from: 1,
+        aisle_to: 8,
+        label: "SRA1 · aisle 01-08",
+        reason: "Rule GSheet",
+      },
+      {
+        zone: "MZD1",
+        aisle_from: 1,
+        aisle_to: 36,
+        label: "MZD1 · aisle 01-36",
+        reason: "Rule GSheet",
+      },
+    ],
+  );
 });
 
 test("planogram detail API parameters and client filters stay bounded", () => {

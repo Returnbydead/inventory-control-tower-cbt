@@ -23,8 +23,20 @@ function wrongRow(overrides = {}) {
     status: "WRONG_L1",
     wrong_qty: 12,
     suggestions: [
-      { zone: "SRC1", aisle: 23 },
-      { zone: "SRC1", aisle: 24 },
+      {
+        zone: "SRC1",
+        aisle: 23,
+        aisle_from: 23,
+        aisle_to: 24,
+        aisle_label: "23-24",
+      },
+      {
+        zone: "MZB2",
+        aisle: 1,
+        aisle_from: 1,
+        aisle_to: 36,
+        aisle_label: "01-36",
+      },
     ],
     ...overrides,
   };
@@ -44,14 +56,14 @@ test("existing Planogram key disables the same candidate", () => {
   assert.equal(row.task_status, "GENERATED");
 });
 
-test("posted Planogram task uses current wrong qty and keeps all zone aisle options", () => {
+test("posted Planogram task keeps the exact GSheet range options", () => {
   const [row] = annotatePlanogramRows([wrongRow()], []);
   const selected = selectCurrentTasks([row], normalizeSelectedTaskKeys([row.task_key]));
   const task = toPostedPlanogramTask(selected[0]);
   assert.equal(task.move_qty, 12);
   assert.equal(task.suggested_zone, "SRC1");
   assert.equal(task.suggested_aisle, 23);
-  assert.equal(task.suggestion_options, "SRC1 - aisle 23 | SRC1 - aisle 24");
+  assert.equal(task.suggestion_options, "SRC1 - aisle 23-24 | MZB2 - aisle 01-36");
   assert.equal(task.suggested_rack_name, "");
 });
 
