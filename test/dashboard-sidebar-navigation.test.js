@@ -10,6 +10,8 @@ const dashboardPages = [
   ["Putaway", readPage("public", "preview", "putaway-superset-ledger.html")],
   ["Planogram", readPage("public", "preview", "planogram-l1-monitoring-prototype.html")],
   ["Occupancy", readPage("public", "preview", "occupancy-dashboard-preview.html")],
+  ["Replenishment", readPage("public", "preview", "replenishment-calculator.html")],
+  ["MZC2", readPage("public", "preview", "mzc2-sku-rebalancing-prototype.html")],
   ["Spatial", readPage("public", "sra1-spatial-prototype.html")],
 ];
 
@@ -20,6 +22,8 @@ test("every operational dashboard keeps the full navigation list", () => {
       "3D Rack View",
       "Planogram Accuracy",
       "Occupancy",
+      "Replenishment Calculator",
+      "MZC2 Rebalancing",
       "Lost Monitoring",
     ]) {
       assert.match(html, new RegExp(label), `${label} is missing from ${name}`);
