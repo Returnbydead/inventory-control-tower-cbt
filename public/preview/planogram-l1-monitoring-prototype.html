@@ -115,6 +115,13 @@
     .task-state { color: var(--ink-2); font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 700; white-space: nowrap; }
     .task-state.ready { color: var(--safe); }
     .task-state.generated { color: var(--accent-strong); }
+    .assignment-bar { display: grid; grid-template-columns: minmax(18rem, 1fr) minmax(20rem, 1.5fr) auto; align-items: center; gap: var(--space-md); padding: var(--space-sm) var(--space-lg); border-block-end: 1px solid var(--rule); background: var(--paper-2); }
+    .assignment-copy { display: grid; gap: var(--space-2xs); min-width: 0; }
+    .assignment-copy strong { font-size: var(--text-sm); }
+    .assignment-copy span { color: var(--ink-2); font-size: var(--text-xs); }
+    .assignment-workloads { display: flex; align-items: center; gap: var(--space-xs); min-width: 0; overflow-x: auto; }
+    .assignment-workload { display: inline-flex; gap: var(--space-xs); padding: var(--space-2xs) var(--space-xs); border: 1px solid var(--rule); border-radius: var(--radius); background: var(--surface); font-family: var(--font-mono); font-size: var(--text-xs); white-space: nowrap; }
+    .assignment-workload b { color: var(--accent-strong); }
     .table-shell { width: 100%; max-height: 31rem; overflow: auto; }
     .table-shell.tall { max-height: 38rem; }
     table { width: 100%; min-width: 45rem; border-collapse: collapse; font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
@@ -141,7 +148,7 @@
     .nav-collapsed .brand-copy, .nav-collapsed .side-text, .nav-collapsed .nav-label, .nav-collapsed .side-foot span:last-child { display: none; }
     .nav-collapsed .workspace { margin-inline-start: 5.25rem; }
     .nav-collapsed .side-link { justify-content: center; }
-    @media (max-width: 74rem) { .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filter-grid .button { width: 100%; } }
+    @media (max-width: 74rem) { .filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .filter-grid .button { width: 100%; } .assignment-bar { grid-template-columns: minmax(0, 1fr) auto; } .assignment-workloads { grid-column: 1 / -1; grid-row: 2; } }
     @media (max-width: 64rem) { #allZoneKpi { grid-template-columns: repeat(2, minmax(0, 1fr)); } .planogram-sheet-grid { grid-template-columns: minmax(0, 1fr); } }
     @media (max-width: 60rem) { .sidebar { display: none; } .workspace { margin-inline-start: 0; } .topbar { padding-inline: var(--space-md); } .split-row { grid-template-columns: minmax(0, 1fr); } }
     @media (max-width: 40rem) { .dashboard { padding: var(--space-xs); } .topbar { align-items: flex-start; } .top-actions { flex-direction: column; align-items: flex-end; } .top-actions .icon-button { display: none; } .freshness { max-width: 14rem; overflow-wrap: anywhere; white-space: normal; text-align: end; } .section-heading { display: block; min-height: auto; padding: var(--space-md); } .section-heading span { display: block; margin-block-start: var(--space-2xs); text-align: start; } .filter-grid, .status-grid, #allZoneKpi { grid-template-columns: minmax(0, 1fr); } .status-card { border-inline-end: 0; border-block-end: 1px solid var(--rule); } .status-card:last-child { border-block-end: 0; } .metric-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); } .planogram-sheet-grid { padding: var(--space-md); gap: var(--space-lg); } }
@@ -175,7 +182,7 @@
 
         <section class="section" id="aisle-accuracy"><header class="section-heading"><h2>L1 Accuracy by Aisle</h2><span>Prioritas aisle dengan salah L1 terbanyak</span></header><div class="table-shell"><table><thead><tr><th class="left">Aisle</th><th>Occupied SLOC</th><th>Correct</th><th>Wrong L1</th><th>Wrong Qty</th><th>Accuracy</th></tr></thead><tbody id="aisleBody"></tbody></table></div></section>
 
-        <section class="section" id="l1-detail"><header class="section-heading"><h2>L1 Detail per SKU &amp; Lokasi</h2><div class="section-actions"><span>1 SKU × occupied location · task masuk ke ledger PLANOGRAM TASK</span><button class="button" id="downloadDetail" type="button" disabled>Download CSV</button><button class="button primary" id="generatePlanogramTasks" type="button" disabled>Generate Task Terpilih</button></div></header><div class="toolbar"><div class="task-toolbar"><label class="task-select"><input id="selectAllPlanogramTasks" type="checkbox" disabled>Pilih semua kandidat yang tampil</label><span class="task-message" id="taskMessage">Memuat kandidat task…</span></div><strong id="detailCount">Memuat detail…</strong></div><div class="table-shell tall"><table style="min-width: 120rem"><thead><tr><th>Pilih</th><th class="left">SKU / Produk</th><th class="left">Current Rack</th><th>Zone</th><th>Aisle</th><th>Sequence</th><th>Level</th><th class="left">Current L1</th><th>Quantity</th><th>Wrong Qty</th><th>Value Risk</th><th class="left">Target di Lokasi Saat Ini</th><th class="left">Saran Placement</th><th class="left">Dasar Saran</th><th>Status L1</th><th>Task</th></tr></thead><tbody id="detailBody"><tr><td class="empty" colspan="16">Memuat detail SKU per lokasi…</td></tr></tbody></table></div></section>
+        <section class="section" id="l1-detail"><header class="section-heading"><h2>L1 Detail per SKU &amp; Lokasi</h2><div class="section-actions"><span>1 SKU × occupied location · task masuk ke ledger PLANOGRAM TASK</span><button class="button" id="downloadDetail" type="button" disabled>Download CSV</button><button class="button primary" id="generatePlanogramTasks" type="button" disabled>Generate Task Terpilih</button></div></header><div class="assignment-bar"><div class="assignment-copy"><strong id="assignmentSummary">Memuat MP MASUK dan task tanpa PIC…</strong><span>Beban dibagi berdasarkan total qty; task tidak dipecah dan PIC yang sudah ada tidak ditimpa.</span></div><div class="assignment-workloads" id="assignmentWorkloads" aria-label="Preview beban manpower"></div><button class="button primary" id="autoAssignPlanogramPic" type="button" disabled>Auto Assign PIC</button></div><div class="toolbar"><div class="task-toolbar"><label class="task-select"><input id="selectAllPlanogramTasks" type="checkbox" disabled>Pilih semua kandidat yang tampil</label><span class="task-message" id="taskMessage">Memuat kandidat task…</span></div><strong id="detailCount">Memuat detail…</strong></div><div class="table-shell tall"><table style="min-width: 120rem"><thead><tr><th>Pilih</th><th class="left">SKU / Produk</th><th class="left">Current Rack</th><th>Zone</th><th>Aisle</th><th>Sequence</th><th>Level</th><th class="left">Current L1 Produk</th><th>Quantity</th><th>Wrong Qty</th><th>Value Risk</th><th class="left">Kategori Target Rak Saat Ini</th><th class="left">Saran Placement</th><th class="left">Dasar Saran</th><th>Status L1</th><th>Task</th></tr></thead><tbody id="detailBody"><tr><td class="empty" colspan="16">Memuat detail SKU per lokasi…</td></tr></tbody></table></div></section>
       </div>
     </main>
   </div>
@@ -198,6 +205,8 @@
     let detailPayload = null;
     let zones = [];
     let allZoneSummaries = [];
+    let assignmentPayload = null;
+    let assignmentLoading = false;
     const selectedPlanogramTaskKeys = new Set();
     const selectedZoneValues = () => [...document.querySelectorAll('#zoneOptions input:checked')].map(input => input.value);
     function updateZonePickerSummary() { const selected = selectedZoneValues(); $('#zonePickerSummary').textContent = selected.includes('ALL') ? 'Semua zona' : selected.length === 1 ? selected[0] : selected.length ? `${selected.length} zona dipilih` : 'Pilih zona'; }
@@ -220,22 +229,27 @@
     }
     function taskState(row) {
       if (row.task_status === 'GENERATED') return '<span class="task-state generated">GENERATED</span>';
+      if (row.task_status === 'VERIFY_ON_GENERATE') return '<span class="task-state ready">VERIFY</span>';
       if (row.task_eligible) return '<span class="task-state ready">READY</span>';
       return '<span class="task-state">—</span>';
     }
     function updatePlanogramTaskControls(rows = detailPayload?.rows || []) {
       const candidates = rows.filter(row => row.task_eligible);
+      const planogramStale = Boolean(detailPayload?.planogram_stale);
+      const generationAvailable = detailPayload?.generation_available !== false;
       const visibleKeys = new Set(candidates.map(row => row.task_key));
       for (const key of [...selectedPlanogramTaskKeys]) if (!visibleKeys.has(key)) selectedPlanogramTaskKeys.delete(key);
       const selectedCount = selectedPlanogramTaskKeys.size;
       const generatedCount = rows.filter(row => row.task_status === 'GENERATED').length;
       const selectAll = $('#selectAllPlanogramTasks');
-      selectAll.disabled = !candidates.length;
+      selectAll.disabled = !generationAvailable || !candidates.length;
       selectAll.checked = candidates.length > 0 && candidates.every(row => selectedPlanogramTaskKeys.has(row.task_key));
       selectAll.indeterminate = selectedCount > 0 && !selectAll.checked;
-      $('#generatePlanogramTasks').disabled = selectedCount === 0;
+      $('#generatePlanogramTasks').disabled = !generationAvailable || selectedCount === 0;
       $('#generatePlanogramTasks').textContent = selectedCount ? `Generate ${integer.format(selectedCount)} Task` : 'Generate Task Terpilih';
       $('#taskMessage').textContent = `${integer.format(candidates.length)} kandidat siap · ${integer.format(generatedCount)} sudah generated`;
+      if (generationAvailable && detailPayload?.generation_verification_required) $('#taskMessage').textContent = `${integer.format(candidates.length)} kandidat provisional · rule dan ledger diverifikasi ulang saat Generate`;
+      if (!generationAvailable) $('#taskMessage').textContent = detailPayload?.generation_message || (planogramStale ? 'Aturan GSheet live sedang terganggu · generate task dikunci sampai koneksi pulih' : 'Ledger task GSheet sedang lambat · generate task dikunci sampai koneksi pulih');
     }
     function renderDetails(data) {
       detailPayload = data;
@@ -260,6 +274,7 @@
         { value: row => statusChip(row.status) },
         { value: row => taskState(row) },
       ], 'Tidak ada detail SKU × lokasi untuk filter ini.');
+      if (data?.generation_available === false) document.querySelectorAll('.task-checkbox').forEach(checkbox => { checkbox.disabled = true; });
       updatePlanogramTaskControls(rows);
     }
     async function loadDetailData(selected) {
@@ -304,11 +319,61 @@
         const data = await response.json();
         if (!response.ok || !data.ok) throw new Error(data.message || `Generate gagal: HTTP ${response.status}`);
         selectedPlanogramTaskKeys.clear();
-        await loadDetailData(selectedZoneValues());
+        await Promise.all([loadDetailData(selectedZoneValues()), loadPlanogramAssignmentPreview()]);
         $('#taskMessage').textContent = `${integer.format(data.inserted)} task berhasil dibuat · ${integer.format(data.skipped)} dilewati`;
       } catch (error) {
         $('#taskMessage').textContent = error.message;
         updatePlanogramTaskControls();
+      }
+    }
+    function renderPlanogramAssignment(data = assignmentPayload) {
+      assignmentPayload = data;
+      const button = $('#autoAssignPlanogramPic');
+      const manpowerCount = number(data?.manpower_count);
+      const taskCount = number(data?.eligible_task_count);
+      const qty = number(data?.eligible_qty);
+      button.disabled = assignmentLoading || !data?.can_assign;
+      button.textContent = assignmentLoading ? 'Memproses…' : 'Auto Assign PIC';
+      $('#assignmentSummary').textContent = data
+        ? `${integer.format(manpowerCount)} MP MASUK · ${integer.format(taskCount)} task tanpa PIC · ${integer.format(qty)} total qty`
+        : 'Preview auto assign PIC tidak tersedia';
+      $('#assignmentWorkloads').innerHTML = (data?.workloads || []).length
+        ? data.workloads.map(item => `<span class="assignment-workload">${escapeHtml(item.name)} <b>${integer.format(number(item.total_qty))} qty</b> ${integer.format(number(item.total_task_count))} task</span>`).join('')
+        : '<span class="task-message">Belum ada MP dengan SHIFT MASUK.</span>';
+    }
+    async function loadPlanogramAssignmentPreview() {
+      $('#autoAssignPlanogramPic').disabled = true;
+      $('#assignmentSummary').textContent = 'Memuat MP MASUK dan task tanpa PIC…';
+      try {
+        const response = await fetch(`${previewApiOrigin}/api/planogram-assignment`, { cache: 'no-store' });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.message || 'Preview auto assign tidak tersedia');
+        renderPlanogramAssignment(data);
+      } catch (error) {
+        assignmentPayload = null;
+        renderPlanogramAssignment(null);
+        $('#assignmentSummary').textContent = error.message;
+      }
+    }
+    async function autoAssignPlanogramPics() {
+      const data = assignmentPayload;
+      if (!data?.can_assign || assignmentLoading) return;
+      if (!confirm(`Assign ${integer.format(number(data.eligible_task_count))} task (${integer.format(number(data.eligible_qty))} total qty) ke ${integer.format(number(data.manpower_count))} PIC berdasarkan beban qty paling rata?`)) return;
+      assignmentLoading = true;
+      let feedback = '';
+      renderPlanogramAssignment(data);
+      try {
+        const response = await fetch(`${previewApiOrigin}/api/planogram-assignment`, { method: 'POST' });
+        const result = await response.json();
+        if (!response.ok || !result.ok) throw new Error(result.message || `Auto assign gagal: HTTP ${response.status}`);
+        await loadPlanogramAssignmentPreview();
+        feedback = `${integer.format(number(result.assigned_task_count))} task · ${integer.format(number(result.assigned_qty))} qty berhasil di-assign ke PIC`;
+      } catch (error) {
+        feedback = error.message;
+      } finally {
+        assignmentLoading = false;
+        renderPlanogramAssignment(assignmentPayload);
+        if (feedback) $('#assignmentSummary').textContent = feedback;
       }
     }
     function render() {
@@ -396,10 +461,11 @@
     }
     function updateZoneOptions() { const requested = clean(new URLSearchParams(location.search).get('zones')).split(',').map(value => value.trim().toUpperCase()).filter(value => zones.includes(value)); const fallback = clean(new URLSearchParams(location.search).get('zone')).toUpperCase(); const selected = requested.length ? requested : zones.includes(fallback) ? [fallback] : ['ALL']; $('#zoneOptions').innerHTML = `<label class="zone-option"><input type="checkbox" value="ALL">Semua zona</label>${zones.map(zone => `<label class="zone-option"><input type="checkbox" value="${escapeHtml(zone)}">${escapeHtml(zone)}</label>`).join('')}`; setSelectedZones(selected); }
     async function loadRules() { const response = await fetch('/data/l1-placement-rules.json'); if (!response.ok) throw new Error('Placement rules tidak dapat dimuat'); const rules = await response.json(); zones = [...new Set(Object.keys(rules.rules || {}).map(key => key.split(':')[0]))].sort(); updateZoneOptions(); }
-    async function loadData() { const selected = selectedZoneValues(); const overview = selected.includes('ALL'); if (!selected.length) { $('#filterMessage').textContent = 'Pilih minimal satu zona terlebih dahulu.'; return; } $('#refresh').disabled = true; $('#statusFilter').disabled = false; $('#searchFilter').disabled = false; $('#freshness').textContent = 'Mengambil live snapshot…'; try { const response = await fetch(rackStatusUrl(selected), { cache: 'no-store' }); const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.message || 'Snapshot L1 tidak tersedia'); payload = data; const url = new URL(location.href); url.searchParams.delete('zone'); url.searchParams.delete('zones'); if (overview) url.searchParams.set('zone', 'ALL'); else url.searchParams.set('zones', selected.join(',')); history.replaceState({}, '', url); $('#freshness').textContent = data.snapshot_at ? `Live · ${new Date(data.snapshot_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}` : 'Live snapshot'; render(); await Promise.all([loadAllZoneAccuracy(selected, data), loadDetailData(selected)]); } catch (error) { $('.dashboard').insertAdjacentHTML('afterbegin', `<section class="error"><strong>Snapshot L1 belum bisa dimuat.</strong>${escapeHtml(error.message)}</section>`); $('#freshness').textContent = 'Live unavailable'; } finally { $('#refresh').disabled = false; } }
+    async function loadData() { const selected = selectedZoneValues(); const overview = selected.includes('ALL'); if (!selected.length) { $('#filterMessage').textContent = 'Pilih minimal satu zona terlebih dahulu.'; return; } document.querySelectorAll('.dashboard > .error').forEach(node => node.remove()); $('#refresh').disabled = true; $('#statusFilter').disabled = false; $('#searchFilter').disabled = false; $('#freshness').textContent = 'Mengambil live snapshot…'; try { const response = await fetch(rackStatusUrl(selected), { cache: 'no-store' }); const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.message || 'Snapshot L1 tidak tersedia'); payload = data; const url = new URL(location.href); url.searchParams.delete('zone'); url.searchParams.delete('zones'); if (overview) url.searchParams.set('zone', 'ALL'); else url.searchParams.set('zones', selected.join(',')); history.replaceState({}, '', url); const snapshotLabel = data.snapshot_at ? `Live · ${new Date(data.snapshot_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })}` : 'Live snapshot'; $('#freshness').textContent = data.planogram_stale ? `${snapshotLabel} · rule cache` : snapshotLabel; render(); await Promise.all([loadAllZoneAccuracy(selected, data), loadDetailData(selected), loadPlanogramAssignmentPreview()]); } catch (error) { $('.dashboard').insertAdjacentHTML('afterbegin', `<section class="error"><strong>Snapshot L1 belum bisa dimuat.</strong>${escapeHtml(error.message)}</section>`); $('#freshness').textContent = 'Live unavailable'; } finally { $('#refresh').disabled = false; } }
     async function loadAllZoneAccuracy(selected = selectedZoneValues(), data = payload) { const setReport = source => { const summaries = source.zone_summaries || {}; const reportZones = selected.includes('ALL') ? Object.keys(summaries) : selected; allZoneSummaries = reportZones.map(zone => ({ zone, ...uiSummary(summaries[zone]) })).sort((a, b) => a.zone.localeCompare(b.zone)); $('#allZoneMessage').innerHTML = `<strong>${integer.format(allZoneSummaries.length)} zona</strong> · % SLOC dan % Quantity dihitung hanya dari SLOC yang memiliki target L1.`; renderAllZoneAccuracy(); }; if (data?.zone_summaries) { setReport(data); return; } const activeZone = selected[0]; allZoneSummaries = [{ zone: activeZone, ...uiSummary(data?.summary) }]; $('#allZoneMessage').innerHTML = `<strong>${escapeHtml(activeZone)}</strong> · report mengikuti zona yang dipilih.`; renderAllZoneAccuracy(); }
     function resetFilter() { $('#statusFilter').value = ''; $('#searchFilter').value = ''; setSelectedZones(['ALL']); loadData(); }
     $('#navToggle').addEventListener('click', () => { const collapsed = document.body.classList.toggle('nav-collapsed'); $('#navToggle').setAttribute('aria-expanded', String(!collapsed)); });
+    $('#autoAssignPlanogramPic').addEventListener('click', autoAssignPlanogramPics);
     $('#applyFilter').addEventListener('click', loadData); $('#resetFilter').addEventListener('click', resetFilter); $('#refresh').addEventListener('click', loadData); $('#downloadDetail').addEventListener('click', downloadDetailCsv); $('#generatePlanogramTasks').addEventListener('click', generateSelectedPlanogramTasks); $('#selectAllPlanogramTasks').addEventListener('change', event => { const candidates = (detailPayload?.rows || []).filter(row => row.task_eligible); for (const row of candidates) { if (event.target.checked) selectedPlanogramTaskKeys.add(row.task_key); else selectedPlanogramTaskKeys.delete(row.task_key); } renderDetails(detailPayload); }); $('#detailBody').addEventListener('change', event => { const checkbox = event.target.closest('.task-checkbox'); if (!checkbox) return; if (checkbox.checked) selectedPlanogramTaskKeys.add(checkbox.dataset.taskKey); else selectedPlanogramTaskKeys.delete(checkbox.dataset.taskKey); updatePlanogramTaskControls(); }); $('#selectAllZones').addEventListener('click', () => setSelectedZones(['ALL'])); $('#clearZones').addEventListener('click', () => setSelectedZones([])); $('#zoneOptions').addEventListener('change', event => { const changed = event.target; if (!changed.matches('input')) return; if (changed.value === 'ALL' && changed.checked) setSelectedZones(['ALL']); else if (changed.value !== 'ALL') { const checked = selectedZoneValues().filter(value => value !== 'ALL'); setSelectedZones(checked); } else updateZonePickerSummary(); }); $('#searchFilter').addEventListener('keydown', event => { if (event.key === 'Enter') loadData(); });
     (async () => { try { await loadRules(); await loadData(); } catch (error) { $('.dashboard').innerHTML = `<section class="error"><strong>Preview belum bisa disiapkan.</strong>${escapeHtml(error.message)}</section>`; } })();
   </script>

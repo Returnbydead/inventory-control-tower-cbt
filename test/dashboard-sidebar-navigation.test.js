@@ -26,3 +26,17 @@ test("every operational dashboard keeps the full navigation list", () => {
     }
   }
 });
+
+test("retired Replenishment calculator is absent from runtime and navigation", () => {
+  for (const [name, html] of dashboardPages) {
+    assert.doesNotMatch(html, /Replenishment Calculator/i, `retired menu is still present in ${name}`);
+    assert.doesNotMatch(html, /href=["']\/replenishment["']/i, `retired route is still linked in ${name}`);
+  }
+
+  assert.equal(fs.existsSync(path.join(root, "api", "replenishment-calculator.js")), false);
+  assert.equal(fs.existsSync(path.join(root, "public", "preview", "replenishment-calculator.html")), false);
+
+  const vercel = JSON.parse(readPage("vercel.json"));
+  assert.equal(vercel.rewrites.some((rewrite) => rewrite.source === "/replenishment"), false);
+  assert.equal(Object.hasOwn(vercel.functions, "api/replenishment-calculator.js"), false);
+});

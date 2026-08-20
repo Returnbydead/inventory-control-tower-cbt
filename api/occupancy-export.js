@@ -18,10 +18,10 @@ const PLANOGRAM_EXPORT_HEADERS = Object.freeze([
   "Aisle",
   "Sequence",
   "Level",
-  "Current L1",
+  "Current L1 Produk",
   "Quantity",
   "Wrong Qty",
-  "Target di Lokasi Saat Ini",
+  "Kategori Target Rak Saat Ini",
   "Saran Placement",
   "Status",
 ]);

@@ -60,7 +60,7 @@ test("planogram detail export mirrors the simple table without values or suggest
 
   assert.deepEqual(PLANOGRAM_EXPORT_HEADERS, [
     "SKU Number", "Product Name", "Current Rack", "Zone", "Aisle", "Sequence", "Level",
-    "Current L1", "Quantity", "Wrong Qty", "Target di Lokasi Saat Ini",
+    "Current L1 Produk", "Quantity", "Wrong Qty", "Kategori Target Rak Saat Ini",
     "Saran Placement", "Status",
   ]);
   assert.equal(row.length, PLANOGRAM_EXPORT_HEADERS.length);

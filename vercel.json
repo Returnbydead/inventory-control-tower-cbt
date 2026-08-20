@@ -16,10 +16,6 @@
     {
       "source": "/occupancy",
       "destination": "/preview/occupancy-dashboard-preview.html"
-    },
-    {
-      "source": "/replenishment",
-      "destination": "/preview/replenishment-calculator.html"
     }
   ],
   "functions": {
@@ -35,10 +31,10 @@
     "api/planogram-detail.js": {
       "maxDuration": 300
     },
-    "api/sync-putaway.js": {
-      "maxDuration": 300
+    "api/planogram-assignment.js": {
+      "maxDuration": 60
     },
-    "api/replenishment-calculator.js": {
+    "api/sync-putaway.js": {
       "maxDuration": 300
     }
   }

@@ -180,6 +180,8 @@ module.exports = async function handler(req, res) {
       snapshot_at: snapshotAt,
       planogram_source: planogram.source,
       planogram_rule_count: planogram.rule_count,
+      planogram_stale: Boolean(planogram.stale),
+      planogram_cached_at: planogram.cached_at || null,
       empty_semantics: "Master SLOC absent from locations is EMPTY.",
       summary: summarize(locations),
       ...(allZones || selectedZones.length > 1 ? { zone_summaries: summarizeByZone(locations) } : {}),

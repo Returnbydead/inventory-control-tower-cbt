@@ -5,7 +5,13 @@ const {
   buildPlanogramDetailRows,
   filterPlanogramDetailRows,
 } = require("../lib/planogram-detail");
-const { limitValue, selectedZones, sortRows } = require("../api/planogram-detail")._test;
+const {
+  limitValue,
+  prepareGeneration,
+  selectedZones,
+  sortRows,
+  STRICT_PLANOGRAM_FETCH_OPTIONS,
+} = require("../api/planogram-detail")._test;
 
 function row(overrides = {}) {
   return {
@@ -111,4 +117,36 @@ test("ready Planogram tasks stay above generated rows across 500-row batches", (
     { task_eligible: true, status: "WRONG_L1", wrong_value: 1, stock: 1, rack_name: "B", sku_number: "2" },
   ]);
   assert.equal(sorted[0].task_eligible, true);
+});
+
+test("a slow read-only ledger keeps candidates selectable for strict verification on POST", () => {
+  const state = prepareGeneration(
+    buildPlanogramDetailRows([row()]),
+    { available: false, ledger: { tasks: [], keys: [] } },
+    false,
+  );
+
+  assert.equal(state.generationAvailable, true);
+  assert.equal(state.verificationRequired, true);
+  assert.equal(state.rows[0].task_eligible, true);
+  assert.equal(state.rows[0].task_status, "VERIFY_ON_GENERATE");
+});
+
+test("stale Planogram rules keep provisional candidates for strict verification on POST", () => {
+  const state = prepareGeneration(
+    buildPlanogramDetailRows([row()]),
+    { available: true, ledger: { tasks: [], keys: [] } },
+    true,
+  );
+
+  assert.equal(state.generationAvailable, true);
+  assert.equal(state.verificationRequired, true);
+  assert.equal(state.rows[0].task_eligible, true);
+  assert.equal(state.rows[0].task_status, "VERIFY_ON_GENERATE");
+  assert.deepEqual(STRICT_PLANOGRAM_FETCH_OPTIONS, {
+    allowFallback: false,
+    retries: 2,
+    retryDelayMs: 1000,
+    timeoutMs: 30000,
+  });
 });

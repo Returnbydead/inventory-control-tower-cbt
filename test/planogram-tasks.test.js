@@ -4,6 +4,7 @@ const assert = require("node:assert/strict");
 const {
   annotatePlanogramRows,
   buildPlanogramTaskKey,
+  fetchPlanogramTaskLedger,
   normalizeSelectedTaskKeys,
   selectCurrentTasks,
   toPostedPlanogramTask,
@@ -74,5 +75,20 @@ test("stale or generated selection is rejected before posting", () => {
   assert.throws(
     () => selectCurrentTasks([row], [row.task_key]),
     /sudah berubah atau sudah tergenerate/,
+  );
+});
+
+test("Planogram task ledger aborts instead of hanging indefinitely", async () => {
+  const neverResponds = async (_url, options) => new Promise((_resolve, reject) => {
+    options.signal.addEventListener("abort", () => reject(options.signal.reason));
+  });
+
+  await assert.rejects(
+    fetchPlanogramTaskLedger({
+      fetchImpl: neverResponds,
+      gasUrlValue: "https://example.com/exec",
+      timeoutMs: 10,
+    }),
+    /abort|timeout/i,
   );
 });

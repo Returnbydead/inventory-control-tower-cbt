@@ -76,3 +76,31 @@ test("planogram renders all-zone operational details without the retired priorit
   assert.ok(!html.includes('id="priority-rack"'), "retired priority rack panel is still present");
   assert.ok(!html.includes("compatibleRackIndex"), "retired rack-only suggestion engine is still present");
 });
+
+test("planogram distinguishes the product category from the current rack target", () => {
+  assert.ok(html.includes("Current L1 Produk"), "product L1 header is ambiguous");
+  assert.ok(html.includes("Kategori Target Rak Saat Ini"), "current rack target header is ambiguous");
+});
+
+test("planogram exposes qty-balanced PIC auto assignment", () => {
+  for (const marker of [
+    'id="autoAssignPlanogramPic"',
+    'id="assignmentSummary"',
+    'id="assignmentWorkloads"',
+    "/api/planogram-assignment",
+    "loadPlanogramAssignmentPreview",
+    "autoAssignPlanogramPics",
+    "Beban dibagi berdasarkan total qty",
+  ]) assert.ok(html.includes(marker), `${marker} is missing`);
+  assert.match(html, /confirm\(`Assign .*total qty.*PIC/);
+});
+
+test("planogram keeps read-only data visible but locks generation while live rules are stale", () => {
+  assert.match(html, /data\.planogram_stale \? `\$\{snapshotLabel\}.*rule cache`/);
+  assert.match(html, /!generationAvailable \|\| selectedCount === 0/);
+  assert.match(html, /Aturan GSheet live sedang terganggu/);
+  assert.match(html, /Ledger task GSheet sedang lambat/);
+  assert.match(html, /rule dan ledger diverifikasi ulang saat Generate/);
+  assert.match(html, /VERIFY_ON_GENERATE/);
+  assert.match(html, /document\.querySelectorAll\('\.dashboard > \.error'\)/);
+});
