@@ -100,6 +100,16 @@ test("uses server-backed filters and separates used time from SLA deficit", () =
   assert.match(html, /remaining_minutes/);
 });
 
+test("expands the raw SLA table for TV viewing and restores it with Escape", () => {
+  assert.match(html, /id="queueExpand"/);
+  assert.match(html, /aria-controls="queueTableShell"/);
+  assert.match(html, /\.queue-section\.is-expanded/);
+  assert.match(html, /\.queue-section\.is-expanded \.table-shell\.tall \{[\s\S]*?max-height: none;/);
+  assert.match(html, /function setQueueExpanded\(active\)/);
+  assert.match(html, /event\.key === "Escape"/);
+  assert.match(html, /setQueueExpanded\(false\)/);
+});
+
 test("refreshes live data for TV use and has an explicit demo fallback", () => {
   assert.match(html, /get\("live"\) === "1"/);
   assert.match(html, /location\.hostname\.endsWith\("\.vercel\.app"\)/);

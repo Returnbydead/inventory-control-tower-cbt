@@ -307,6 +307,21 @@
         font-size: var(--text-sm);
         text-align: end;
       }
+      .section-heading-actions {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: var(--space-sm);
+      }
+      .table-expand-button {
+        min-height: 2.25rem;
+        padding-inline: var(--space-sm);
+        border-color: var(--rule-strong);
+        background: var(--surface);
+        cursor: pointer;
+        font-size: var(--text-sm);
+        font-weight: 700;
+      }
       .section-body {
         padding: var(--space-md) var(--space-lg) var(--space-lg);
       }
@@ -540,6 +555,27 @@
       }
       .queue-section .table-shell.tall {
         max-height: 44rem;
+      }
+      body.queue-table-expanded {
+        overflow: hidden;
+      }
+      .queue-section.is-expanded {
+        position: fixed;
+        inset: 0;
+        z-index: calc(var(--z-sticky) + 10);
+        display: flex;
+        flex-direction: column;
+        border: 0;
+        border-radius: 0;
+      }
+      .queue-section.is-expanded .section-heading,
+      .queue-section.is-expanded .toolbar {
+        flex: 0 0 auto;
+      }
+      .queue-section.is-expanded .table-shell.tall {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: none;
       }
       table {
         width: 100%;
@@ -978,13 +1014,24 @@
             <section class="section queue-section">
               <header class="section-heading">
                 <h2>Putaway SLA by Asset ID &amp; Task Number</h2>
-                <span>Priority queue · SLA 1 jam sejak IN PROGRESS</span>
+                <div class="section-heading-actions">
+                  <span>Priority queue · SLA 1 jam sejak IN PROGRESS</span>
+                  <button
+                    id="queueExpand"
+                    class="table-expand-button"
+                    type="button"
+                    aria-controls="queueTableShell"
+                    aria-expanded="false"
+                  >
+                    ⛶ Expand Table
+                  </button>
+                </div>
               </header>
               <div class="toolbar">
                 <span>Active tasks dari filter saat ini</span
                 ><strong id="queueCount">0 records</strong>
               </div>
-              <div class="table-shell tall">
+              <div id="queueTableShell" class="table-shell tall">
                 <table>
                   <thead>
                     <tr>
@@ -1633,6 +1680,35 @@
           .querySelector("#navToggle")
           .setAttribute("aria-expanded", String(expanded));
       });
+      const queueSection = document.querySelector(".queue-section");
+      const queueExpand = document.querySelector("#queueExpand");
+      function setQueueExpanded(active) {
+        queueSection.classList.toggle("is-expanded", active);
+        document.body.classList.toggle("queue-table-expanded", active);
+        queueExpand.setAttribute("aria-expanded", String(active));
+        queueExpand.setAttribute(
+          "aria-label",
+          active ? "Tutup tampilan penuh raw table" : "Expand raw table satu layar",
+        );
+        queueExpand.textContent = active
+          ? "✕ Close Table"
+          : "⛶ Expand Table";
+      }
+
+      queueExpand.addEventListener("click", () => {
+        setQueueExpanded(!queueSection.classList.contains("is-expanded"));
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (
+          event.key === "Escape" &&
+          queueSection.classList.contains("is-expanded")
+        ) {
+          setQueueExpanded(false);
+          queueExpand.focus();
+        }
+      });
+
       function setTvMode(active) {
         document.body.classList.toggle("tv-mode", active);
         document.querySelector("#tvMode").textContent = active
