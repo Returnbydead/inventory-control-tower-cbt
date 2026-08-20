@@ -10,33 +10,48 @@ const {
   priorityRank,
 } = require("../lib/putaway-sla");
 
-test("uses the official six-hour SLA across 24 calendar hours", () => {
-  assert.equal(SLA_MINUTES, 360);
-  assert.equal(classifyElapsed(239), "SAFE");
-  assert.equal(classifyElapsed(240), "AT_RISK");
-  assert.equal(classifyElapsed(300), "URGENT");
-  assert.equal(classifyElapsed(360), "BREACHED");
+test("uses the official one-hour SLA across 24 calendar hours", () => {
+  assert.equal(SLA_MINUTES, 60);
+  assert.equal(classifyElapsed(39), "SAFE");
+  assert.equal(classifyElapsed(40), "AT_RISK");
+  assert.equal(classifyElapsed(50), "URGENT");
+  assert.equal(classifyElapsed(60), "BREACHED");
   assert.equal(classifyElapsed(2880), "BREACHED");
 });
 
-test("calculates active SLA from GRN until now", () => {
+test("starts the one-hour SLA at IN_PROGRESS instead of GR or PENDING", () => {
+  assert.equal(SLA_MINUTES, 60);
   assert.deepEqual(calculateSla({
-    grnAt: "2026-07-26T00:00:00+07:00",
-    now: new Date("2026-07-26T05:30:00+07:00"),
+    inProgressAt: "2026-08-20T10:00:00+07:00",
+    now: new Date("2026-08-20T10:50:00+07:00"),
   }), {
-    elapsed_minutes: 330,
-    remaining_minutes: 30,
+    elapsed_minutes: 50,
+    remaining_minutes: 10,
     sla_state: "URGENT",
     within_sla: null,
-    sla_deadline_at: "2026-07-25T23:00:00.000Z",
+    sla_deadline_at: "2026-08-20T04:00:00.000Z",
+    sla_outcome: null,
+  });
+});
+
+test("calculates active SLA from IN_PROGRESS until now", () => {
+  assert.deepEqual(calculateSla({
+    inProgressAt: "2026-07-26T00:00:00+07:00",
+    now: new Date("2026-07-26T00:50:00+07:00"),
+  }), {
+    elapsed_minutes: 50,
+    remaining_minutes: 10,
+    sla_state: "URGENT",
+    within_sla: null,
+    sla_deadline_at: "2026-07-25T18:00:00.000Z",
     sla_outcome: null,
   });
 });
 
 test("calculates completed task compliance", () => {
   const result = calculateSla({
-    grnAt: "2026-07-26T00:00:00+07:00",
-    completedAt: "2026-07-26T06:01:00+07:00",
+    inProgressAt: "2026-07-26T00:00:00+07:00",
+    completedAt: "2026-07-26T01:01:00+07:00",
   });
   assert.equal(result.within_sla, false);
   assert.equal(result.sla_outcome, "MISSED");
@@ -45,14 +60,13 @@ test("calculates completed task compliance", () => {
 
 test("does not fabricate an SLA result for completed task without completion time", () => {
   const result = calculateSla({
-    grnAt: "2026-07-26T00:00:00+07:00",
     isCompleted: true,
     now: new Date("2026-07-27T00:00:00+07:00"),
   });
   assert.equal(result.elapsed_minutes, null);
   assert.equal(result.sla_state, "NOT_STARTED");
   assert.equal(result.sla_outcome, null);
-  assert.equal(result.sla_deadline_at, "2026-07-25T23:00:00.000Z");
+  assert.equal(result.sla_deadline_at, null);
 });
 
 test("normalizes WIMS task activities", () => {

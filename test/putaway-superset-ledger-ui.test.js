@@ -10,6 +10,7 @@ const html = fs.readFileSync(
 
 test("keeps the dashboard focused on Putaway", () => {
   assert.match(html, /Putaway Operational Ledger/);
+  assert.match(html, /SLA 1 jam sejak IN PROGRESS/);
   assert.doesNotMatch(html, /Inbound Forecast &amp; Actual/);
   assert.doesNotMatch(html, /Inbound PO-Today/);
 });

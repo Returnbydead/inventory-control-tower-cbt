@@ -130,11 +130,12 @@ function buildDashboard(taskRows, itemRows, {
     const completedAt = iso(row.completed_at);
     const inboundReceivedAt = iso(row.received_at);
     const pendingAt = iso(row.pending_at);
-    // Operational SLA starts at the WMS PENDING activity. PO/GR data is a
-    // fallback only when that history has not been retrieved yet.
+    const inProgressAt = iso(row.in_progress_at);
+    // Operational SLA starts only when WMS moves the task to IN_PROGRESS.
+    // PO/GR and PENDING timestamps remain inbound context, not SLA fallbacks.
     const doneGrAt = pendingAt || inboundReceivedAt;
     const slaResult = calculateSla({
-      grnAt: doneGrAt,
+      inProgressAt,
       completedAt,
       now,
       isCompleted: status === "COMPLETED",
@@ -148,7 +149,7 @@ function buildDashboard(taskRows, itemRows, {
       status,
       staff_name: clean(row.staff_name) || null,
       pending_at: pendingAt,
-      in_progress_at: iso(row.in_progress_at),
+      in_progress_at: inProgressAt,
       completed_at: completedAt,
       received_at: doneGrAt,
       done_gr_source: pendingAt ? "PUTAWAY_PENDING" : inboundReceivedAt ? "INBOUND_PO" : null,
@@ -400,13 +401,14 @@ function buildDashboard(taskRows, itemRows, {
   );
   return {
     snapshot_at: snapshotAt,
-    official_sla_minutes: 360,
+    official_sla_minutes: 60,
     clock_basis: "24x7 calendar time",
     scope: {
       active_statuses: ["PENDING", "IN_PROGRESS"],
       completed_window: "TODAY_ASIA_JAKARTA",
       included_po_prefix: "ID1/POR/",
       done_gr_basis: "WMS_PENDING_ACTIVITY",
+      sla_start_basis: "WMS_IN_PROGRESS_ACTIVITY",
     },
     summary,
     status_breakdown: statusBreakdown,

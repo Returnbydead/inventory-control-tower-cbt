@@ -978,7 +978,7 @@
             <section class="section queue-section">
               <header class="section-heading">
                 <h2>Putaway SLA by Asset ID &amp; Task Number</h2>
-                <span>Priority queue · SLA paling kritis di atas</span>
+                <span>Priority queue · SLA 1 jam sejak IN PROGRESS</span>
               </header>
               <div class="toolbar">
                 <span>Active tasks dari filter saat ini</span
@@ -1234,8 +1234,9 @@
             staff_name: null,
             status: "IN_PROGRESS",
             received_at: "2026-07-26T00:00:00.000Z",
+            in_progress_at: "2026-07-26T06:00:00.000Z",
             remaining_minutes: -60,
-            elapsed_minutes: 420,
+            elapsed_minutes: 120,
             sla_state: "BREACHED",
             sku_count: 1,
             total_qty: 20,
@@ -1257,9 +1258,9 @@
             staff_name: null,
             status: "PENDING",
             received_at: "2026-07-26T06:00:00.000Z",
-            remaining_minutes: 300,
-            elapsed_minutes: 60,
-            sla_state: "SAFE",
+            remaining_minutes: null,
+            elapsed_minutes: null,
+            sla_state: "NOT_STARTED",
             sku_count: 1,
             total_qty: 12,
             items: [

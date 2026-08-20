@@ -7,14 +7,16 @@ test("builds SLA summary and prioritizes breached tasks", () => {
   const tasks = [
     {
       task_id: 1,
-      status: "PENDING",
+      status: "IN_PROGRESS",
       received_at: "2026-07-26T00:00:00.000Z",
+      in_progress_at: "2026-07-26T05:30:00.000Z",
       synced_at: "2026-07-26T07:00:00.000Z",
     },
     {
       task_id: 2,
       status: "IN_PROGRESS",
       received_at: "2026-07-26T03:00:00.000Z",
+      in_progress_at: "2026-07-26T06:20:00.000Z",
       synced_at: "2026-07-26T07:00:00.000Z",
     },
   ];
@@ -24,8 +26,36 @@ test("builds SLA summary and prioritizes breached tasks", () => {
   assert.equal(dashboard.summary.breached, 1);
   assert.equal(dashboard.summary.at_risk, 1);
   assert.equal(dashboard.tasks[0].task_id, 1);
-  assert.equal(dashboard.tasks[0].sla_deadline_at, "2026-07-26T06:00:00.000Z");
+  assert.equal(dashboard.tasks[0].sla_deadline_at, "2026-07-26T06:30:00.000Z");
   assert.equal(dashboard.tasks[0].sla_outcome, null);
+});
+
+test("keeps PENDING outside SLA and starts the clock at IN_PROGRESS", () => {
+  const dashboard = buildDashboard([
+    {
+      task_id: 11,
+      status: "PENDING",
+      pending_at: "2026-08-20T00:00:00.000Z",
+      received_at: "2026-08-19T23:00:00.000Z",
+    },
+    {
+      task_id: 12,
+      status: "IN_PROGRESS",
+      pending_at: "2026-08-20T00:00:00.000Z",
+      received_at: "2026-08-19T23:00:00.000Z",
+      in_progress_at: "2026-08-20T06:30:00.000Z",
+    },
+  ], [], { now: new Date("2026-08-20T07:20:00.000Z") });
+
+  const pending = dashboard.tasks.find((task) => task.task_id === 11);
+  const inProgress = dashboard.tasks.find((task) => task.task_id === 12);
+  assert.equal(pending.sla_state, "NOT_STARTED");
+  assert.equal(pending.elapsed_minutes, null);
+  assert.equal(inProgress.elapsed_minutes, 50);
+  assert.equal(inProgress.remaining_minutes, 10);
+  assert.equal(inProgress.sla_deadline_at, "2026-08-20T07:30:00.000Z");
+  assert.equal(dashboard.official_sla_minutes, 60);
+  assert.equal(dashboard.scope.sla_start_basis, "WMS_IN_PROGRESS_ACTIVITY");
 });
 
 test("freezes completed SLA at completion and exposes achieved outcome", () => {
@@ -33,13 +63,14 @@ test("freezes completed SLA at completion and exposes achieved outcome", () => {
     task_id: 7,
     status: "COMPLETED",
     received_at: "2026-07-26T00:00:00.000Z",
+    in_progress_at: "2026-07-26T04:45:00.000Z",
     completed_at: "2026-07-26T05:30:00.000Z",
     synced_at: "2026-07-27T07:00:00.000Z",
   }], [], {
     now: new Date("2026-07-26T07:00:00.000Z"),
   });
-  assert.equal(dashboard.tasks[0].elapsed_minutes, 330);
-  assert.equal(dashboard.tasks[0].remaining_minutes, 30);
+  assert.equal(dashboard.tasks[0].elapsed_minutes, 45);
+  assert.equal(dashboard.tasks[0].remaining_minutes, 15);
   assert.equal(dashboard.tasks[0].sla_outcome, "ACHIEVED");
 });
 
@@ -97,7 +128,7 @@ test("summarizes DONE GR quantity, distinct SKU, and distinct PO", () => {
   assert.equal(dashboard.summary.done_gr_tasks, 2);
 });
 
-test("uses the Putaway PENDING activity as a transparent GR fallback", () => {
+test("keeps Putaway PENDING as inbound context without starting SLA", () => {
   const dashboard = buildDashboard([{
     task_id: 9,
     status: "PENDING",
@@ -107,8 +138,8 @@ test("uses the Putaway PENDING activity as a transparent GR fallback", () => {
 
   assert.equal(dashboard.tasks[0].received_at, "2026-07-26T00:02:00.000Z");
   assert.equal(dashboard.tasks[0].done_gr_source, "PUTAWAY_PENDING");
-  assert.equal(dashboard.tasks[0].elapsed_minutes, 60);
-  assert.equal(dashboard.tasks[0].sla_state, "SAFE");
+  assert.equal(dashboard.tasks[0].elapsed_minutes, null);
+  assert.equal(dashboard.tasks[0].sla_state, "NOT_STARTED");
 });
 
 test("keeps only POR tasks and limits completed reporting to Jakarta today", () => {
@@ -161,6 +192,7 @@ test("builds complete operational aggregates before applying the task row limit"
       staff_name: "Operator A",
       status: "COMPLETED",
       received_at: "2026-07-26T00:00:00.000Z",
+      in_progress_at: "2026-07-26T04:30:00.000Z",
       completed_at: "2026-07-26T05:00:00.000Z",
       actual_qty: 30,
     },
@@ -173,6 +205,7 @@ test("builds complete operational aggregates before applying the task row limit"
       staff_name: "Operator A",
       status: "IN_PROGRESS",
       received_at: "2026-07-26T00:00:00.000Z",
+      in_progress_at: "2026-07-26T05:00:00.000Z",
       actual_qty: 30,
     },
     {
