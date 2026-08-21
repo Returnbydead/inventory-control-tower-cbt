@@ -31,6 +31,15 @@ const REPLEN_STATIC_INACTIVE_STATUSES = new Set([
   'DONE',
 ]);
 
+/**
+ * Keep task-writer serialization separate from long-running SOH syncs.
+ * syncSOHStable uses the project-wide ScriptLock, so sharing that lock here
+ * can block Replenishment writes for several minutes.
+ */
+function replenStaticGetTaskWriteLock_() {
+  return LockService.getUserLock();
+}
+
 function getReplenishmentStaticSnapshot_(options) {
   const useCache = !options || options.useCache !== false;
 

@@ -35,15 +35,25 @@ const context = {
   number_: number,
   normalizeHeader_: (value) => clean(value).toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, ''),
   buildTaskKey_: (sku, rack) => `${clean(sku)}|${clean(rack).toUpperCase()}`,
+  LockService: {
+    getUserLock: () => ({ scope: 'replenishment-writer' }),
+    getScriptLock: () => ({ scope: 'global-script' }),
+  },
 };
 
 vm.runInNewContext(
-  `${gasSource}\nthis.__replenTest = { build: replenStaticBuildSnapshot_, parseRack: replenStaticParseRack_ };`,
+  `${gasSource}\nthis.__replenTest = {
+    build: replenStaticBuildSnapshot_,
+    parseRack: replenStaticParseRack_,
+    taskWriteLock: typeof replenStaticGetTaskWriteLock_ === 'function'
+      ? replenStaticGetTaskWriteLock_
+      : null,
+  };`,
   context,
   { filename: gasPath },
 );
 
-const { build, parseRack } = context.__replenTest;
+const { build, parseRack, taskWriteLock } = context.__replenTest;
 
 function param(overrides = {}) {
   return {
@@ -196,6 +206,11 @@ test('static UI calls Apps Script directly and never calls the Replenishment Ver
 
   const vercelIgnore = fs.readFileSync(path.join(root, '.vercelignore'), 'utf8');
   assert.match(vercelIgnore, /^api\/replenishment-calculator\.js$/m);
+});
+
+test('Replenishment task writes use a lock isolated from long SOH sync runs', () => {
+  assert.equal(typeof taskWriteLock, 'function');
+  assert.equal(taskWriteLock().scope, 'replenishment-writer');
 });
 
 test('snapshot payload stays compact and a ten-minute cache warmer is available', () => {
