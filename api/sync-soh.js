@@ -152,7 +152,7 @@ async function fetchSupersetRows(options = {}) {
   const {
     fetchImpl = fetch,
     sleepImpl,
-    csrfTimeoutMs = 15_000,
+    csrfTimeoutMs = 30_000,
     chartTimeoutMs = 90_000,
   } = options;
   const { baseUrl, cookie } = supersetConfig();
@@ -169,9 +169,9 @@ async function fetchSupersetRows(options = {}) {
     `${baseUrl}/api/v1/security/csrf_token/`,
     { headers: commonHeaders },
     {
-      attempts: 3,
+      attempts: 2,
       timeoutMs: csrfTimeoutMs,
-      retryDelaysMs: [2_000, 5_000],
+      retryDelaysMs: [2_000],
       fetchImpl,
       sleepImpl,
       onRetry: retryLogger("csrf"),
