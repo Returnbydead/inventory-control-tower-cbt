@@ -6,6 +6,8 @@ const {
   remarksZone,
   normalizeRow,
   supersetPayload,
+  fetchSupersetRows,
+  expireStaleSyncRuns,
 } = require("../api/sync-soh")._test;
 
 test("parses STL rack structure using aisle 33 and sequence 07", () => {
@@ -50,4 +52,60 @@ test("requests up to 100000 rows from Superset", () => {
   const payload = supersetPayload();
   assert.equal(payload.queries[0].row_limit, 100000);
   assert.equal(payload.form_data.row_limit, 100000);
+});
+
+test("SOH fetch recovers from transient CSRF 502 and chart 524 responses", async () => {
+  const previousCookie = process.env.SUPERSET_SESSION_COOKIE;
+  const previousBaseUrl = process.env.SUPERSET_BASE_URL;
+  process.env.SUPERSET_SESSION_COOKIE = "test-session";
+  process.env.SUPERSET_BASE_URL = "https://dash.example";
+
+  const responses = [
+    new Response("bad gateway", { status: 502 }),
+    new Response('{"result":"csrf-token"}', {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+    new Response("origin timeout", { status: 524 }),
+    new Response('{"result":[{"data":[{"sku_number":"SKU-1"}]}]}', {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    }),
+  ];
+  let calls = 0;
+
+  try {
+    const rows = await fetchSupersetRows({
+      fetchImpl: async () => responses[calls++],
+      sleepImpl: async () => {},
+      csrfTimeoutMs: 100,
+      chartTimeoutMs: 100,
+    });
+
+    assert.deepEqual(rows, [{ sku_number: "SKU-1" }]);
+    assert.equal(calls, 4);
+  } finally {
+    if (previousCookie === undefined) delete process.env.SUPERSET_SESSION_COOKIE;
+    else process.env.SUPERSET_SESSION_COOKIE = previousCookie;
+    if (previousBaseUrl === undefined) delete process.env.SUPERSET_BASE_URL;
+    else process.env.SUPERSET_BASE_URL = previousBaseUrl;
+  }
+});
+
+test("expires a RUNNING sync after the Vercel timeout window", async () => {
+  const calls = [];
+  const client = {
+    query: async (sql, values) => {
+      calls.push({ sql, values });
+      return { rowCount: 1 };
+    },
+  };
+
+  const expired = await expireStaleSyncRuns(client);
+
+  assert.equal(expired, 1);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].sql, /status = 'FAILED'/);
+  assert.match(calls[0].sql, /INTERVAL '6 minutes'/);
+  assert.match(calls[0].sql, /finished_at = CURRENT_TIMESTAMP/);
 });

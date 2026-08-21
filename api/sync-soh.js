@@ -1,6 +1,7 @@
 const { createHash, randomUUID, timingSafeEqual } = require("crypto");
 const { waitUntil } = require("@vercel/functions");
 const { Pool } = require("pg");
+const { requestWithTransientRetry } = require("../lib/superset-request");
 
 const ROW_LIMIT = 100000;
 const BATCH_SIZE = 250;
@@ -147,7 +148,13 @@ function supersetPayload() {
   };
 }
 
-async function fetchSupersetRows() {
+async function fetchSupersetRows(options = {}) {
+  const {
+    fetchImpl = fetch,
+    sleepImpl,
+    csrfTimeoutMs = 15_000,
+    chartTimeoutMs = 90_000,
+  } = options;
   const { baseUrl, cookie } = supersetConfig();
   const commonHeaders = {
     accept: "application/json",
@@ -155,9 +162,21 @@ async function fetchSupersetRows() {
     referer: `${baseUrl}/`,
   };
 
-  const csrfResponse = await fetch(`${baseUrl}/api/v1/security/csrf_token/`, {
-    headers: commonHeaders,
-  });
+  const retryLogger = (stage) => (detail) => {
+    console.warn("Superset request retry", { stage, ...detail });
+  };
+  const csrfResponse = await requestWithTransientRetry(
+    `${baseUrl}/api/v1/security/csrf_token/`,
+    { headers: commonHeaders },
+    {
+      attempts: 3,
+      timeoutMs: csrfTimeoutMs,
+      retryDelaysMs: [2_000, 5_000],
+      fetchImpl,
+      sleepImpl,
+      onRetry: retryLogger("csrf"),
+    },
+  );
   if (!csrfResponse.ok) {
     throw new Error(`Superset session/CSRF gagal: HTTP ${csrfResponse.status}`);
   }
@@ -165,7 +184,7 @@ async function fetchSupersetRows() {
   const csrfToken = clean(csrfPayload?.result);
   if (!csrfToken) throw new Error("Superset tidak mengembalikan CSRF token.");
 
-  const chartResponse = await fetch(
+  const chartResponse = await requestWithTransientRetry(
     `${baseUrl}/api/v1/chart/data?form_data=${encodeURIComponent(JSON.stringify({ slice_id: 21023 }))}`,
     {
       method: "POST",
@@ -175,6 +194,14 @@ async function fetchSupersetRows() {
         "x-csrftoken": csrfToken,
       },
       body: JSON.stringify(supersetPayload()),
+    },
+    {
+      attempts: 2,
+      timeoutMs: chartTimeoutMs,
+      retryDelaysMs: [5_000],
+      fetchImpl,
+      sleepImpl,
+      onRetry: retryLogger("chart"),
     },
   );
 
@@ -396,11 +423,31 @@ function json(res, status, body) {
   return res.status(status).json(body);
 }
 
+async function expireStaleSyncRuns(client) {
+  const result = await client.query(`
+    UPDATE soh_sync_runs SET
+      status = 'FAILED',
+      error_message = COALESCE(
+        error_message,
+        'Run melewati batas Vercel 300 detik dan dipulihkan oleh sync berikutnya.'
+      ),
+      finished_at = CURRENT_TIMESTAMP
+    WHERE status = 'RUNNING'
+      AND started_at < CURRENT_TIMESTAMP - INTERVAL '6 minutes'
+  `);
+  const expired = result.rowCount || 0;
+  if (expired > 0) {
+    console.warn("Expired stale SOH sync runs", { expired });
+  }
+  return expired;
+}
+
 async function executeSync(runId) {
   let client;
   try {
     client = await getPool().connect();
     await ensureSchema(client);
+    await expireStaleSyncRuns(client);
 
     const activeRun = await client.query(`
       SELECT run_id
@@ -487,6 +534,8 @@ module.exports._test = {
   sourceRowKey,
   normalizeRow,
   supersetPayload,
+  fetchSupersetRows,
+  expireStaleSyncRuns,
 };
 
 module.exports._internal = {
