@@ -11,6 +11,7 @@ const {
   selectedZones,
   sortRows,
   STRICT_PLANOGRAM_FETCH_OPTIONS,
+  PLANOGRAM_LEDGER_TIMEOUT_MS,
 } = require("../api/planogram-detail")._test;
 
 function row(overrides = {}) {
@@ -130,6 +131,7 @@ test("a slow read-only ledger keeps candidates selectable for strict verificatio
   assert.equal(state.verificationRequired, true);
   assert.equal(state.rows[0].task_eligible, true);
   assert.equal(state.rows[0].task_status, "VERIFY_ON_GENERATE");
+  assert.equal(PLANOGRAM_LEDGER_TIMEOUT_MS, 30000);
 });
 
 test("stale Planogram rules keep provisional candidates for strict verification on POST", () => {

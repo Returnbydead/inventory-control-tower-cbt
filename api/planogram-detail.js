@@ -15,6 +15,7 @@ const {
 
 const ALL_ZONES = "ALL";
 const ZONE_PATTERN = /^[A-Z]{2,3}\d$/;
+const PLANOGRAM_LEDGER_TIMEOUT_MS = 30000;
 const STRICT_PLANOGRAM_FETCH_OPTIONS = {
   allowFallback: false,
   retries: 2,
@@ -106,7 +107,7 @@ async function handleGet(req, res) {
   const zones = selectedZones(req.query.zones || req.query.zone);
   const [loaded, ledgerState] = await Promise.all([
     loadPlanogramRows(zones),
-    fetchPlanogramTaskLedger()
+    fetchPlanogramTaskLedger({ timeoutMs: PLANOGRAM_LEDGER_TIMEOUT_MS })
       .then((ledger) => ({ available: true, ledger }))
       .catch((error) => {
         console.warn("Planogram task ledger unavailable", { message: error.message });
@@ -152,7 +153,7 @@ async function handlePost(req, res) {
   const loaded = await loadPlanogramRows([ALL_ZONES], {
     planogramOptions: STRICT_PLANOGRAM_FETCH_OPTIONS,
   });
-  const ledger = await fetchPlanogramTaskLedger({ timeoutMs: 30000 });
+  const ledger = await fetchPlanogramTaskLedger({ timeoutMs: PLANOGRAM_LEDGER_TIMEOUT_MS });
   const current = annotatePlanogramRows(loaded.rows, ledger.keys);
   const selected = selectCurrentTasks(current, selectedKeys);
   const result = await postPlanogramTasks(selected.map(toPostedPlanogramTask));
@@ -186,5 +187,6 @@ module.exports._test = {
   prepareGeneration,
   selectedZones,
   sortRows,
+  PLANOGRAM_LEDGER_TIMEOUT_MS,
   STRICT_PLANOGRAM_FETCH_OPTIONS,
 };
