@@ -20,6 +20,13 @@ test("auto assign reads PLANOGRAM_TASK and raw mp from Inventory Movement Task-C
   assert.match(gasSource, /MANPOWER_SHEET: 'raw mp'/);
 });
 
+test("auto assign keeps AppSheet ledger headers compatible", () => {
+  assert.match(
+    gasSource,
+    /planogramAssignHeaderIndexAny_\(taskHeaders, \[\s*'move_qty',\s*'allocated_qty',\s*'replenish_qty'/,
+  );
+});
+
 function loadAllocator() {
   const source = fs.readFileSync(
     path.join(__dirname, "../apps-script/planogram-auto-assign.gs"),

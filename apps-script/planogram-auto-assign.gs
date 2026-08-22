@@ -147,7 +147,11 @@ function loadPlanogramAssignmentSnapshot_() {
   if (taskLastColumn < 1 || taskLastRow < 1) throw new Error('PLANOGRAM_TASK kosong.');
   const taskHeaders = taskSheet.getRange(1, 1, 1, taskLastColumn).getDisplayValues()[0];
   const taskKeyIndex = planogramAssignHeaderIndex_(taskHeaders, 'task_key');
-  const qtyIndex = planogramAssignHeaderIndex_(taskHeaders, 'move_qty');
+  const qtyIndex = planogramAssignHeaderIndexAny_(taskHeaders, [
+    'move_qty',
+    'allocated_qty',
+    'replenish_qty',
+  ]);
   const statusIndex = planogramAssignHeaderIndex_(taskHeaders, 'status');
   const picIndex = planogramAssignHeaderIndex_(taskHeaders, 'pic');
   const taskValues = taskLastRow > 1
@@ -217,6 +221,17 @@ function planogramAssignHeaderIndex_(headers, expected) {
     if (planogramAssignNormalizeHeader_(headers[index]) === target) return index;
   }
   throw new Error('Kolom ' + expected + ' tidak ditemukan.');
+}
+
+function planogramAssignHeaderIndexAny_(headers, expectedNames) {
+  for (let index = 0; index < expectedNames.length; index += 1) {
+    const expected = expectedNames[index];
+    const target = planogramAssignNormalizeHeader_(expected);
+    for (let column = 0; column < headers.length; column += 1) {
+      if (planogramAssignNormalizeHeader_(headers[column]) === target) return column;
+    }
+  }
+  throw new Error('Kolom ' + expectedNames.join(' / ') + ' tidak ditemukan.');
 }
 
 function planogramAssignNormalizeHeader_(value) {
